@@ -5,7 +5,9 @@ import {
 import { getSharedDemoPersistenceAdapter } from "@/lib/server/persistence";
 
 export async function POST(request: Request) {
-  const payload = (await readJson(request)) as DemoMaterialSubmission | null;
+  const payload = (await readJson(request)) as (DemoMaterialSubmission & {
+    workspace?: string;
+  }) | null;
 
   if (!payload || !isMaterialDraft(payload.draft)) {
     return Response.json(
@@ -19,7 +21,10 @@ export async function POST(request: Request) {
 
   return Response.json({
     ok: true,
-    data: await getSharedDemoPersistenceAdapter().submitMaterial(payload.draft),
+    data: await getSharedDemoPersistenceAdapter().submitMaterial(
+      payload.draft,
+      payload.workspace ?? new URL(request.url).searchParams.get("workspace") ?? undefined,
+    ),
   });
 }
 

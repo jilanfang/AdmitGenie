@@ -9,9 +9,9 @@
 
 ## 1. Product Summary
 
-AdmitGenie is an AI-native admissions coach for North America-focused 11th-grade families.
+AdmitGenie is an AI-native admissions coach for North America-focused 9th-11th grade families.
 
-The MVP does not present the user with a large, multi-step intake form. Instead, it starts as a guided interview with a persistent material inbox. The user can talk to the coach, add new materials at any time, and receive an evolving set of recommendations through a weekly brief.
+The MVP does not present the user with a large, multi-step intake form. Instead, it starts as a guided interview with a persistent material inbox. The user can talk to the coach, add new materials at any time, and receive an evolving set of recommendations through a monthly brief.
 
 The core promise is simple:
 
@@ -23,7 +23,7 @@ Families navigating college admissions are overloaded by fragmented information 
 
 Current pain points:
 
-- They do not know what matters most this week.
+- They do not know what matters most right now.
 - They accumulate information without turning it into a stable plan.
 - They struggle to keep profile details, school context, and new updates in sync.
 - They may have materials, but those materials do not automatically become better next-step guidance.
@@ -39,18 +39,23 @@ AdmitGenie MVP is meant to bridge that gap.
 
 ### Primary User
 
-- North America-focused 11th-grade family
-- usually student plus parent, with the student as the main actor and the parent as the main accountability partner
+- North America-focused 9th-11th grade family
+- usually student plus parent using the same coach together, with shared visibility into priorities and next steps
 - moderately to highly engaged in the admissions process
 - willing to talk to an AI coach and share incremental materials
 
 ### Explicitly Not Primary in MVP
 
-- counselor-first workflows
+- counselor-first workflows or counselor CRM
 - school district workflows
 - transfer admissions
 - senior-year emergency submissions
 - essay ghostwriting use cases
+
+### Secondary Early Use Case
+
+- individual counselors or consultants using the same product as a personal productivity tool
+- not a separate institution workflow, CRM, or multi-seat operating system in MVP
 
 ## 4. Jobs To Be Done
 
@@ -89,7 +94,7 @@ AdmitGenie MVP is meant to bridge that gap.
 2. The coach runs a guided interview to collect minimal necessary information.
 3. The user can add materials at any time.
 4. The system extracts and proposes profile updates.
-5. The system generates a Weekly Brief.
+5. The system generates a Monthly Brief.
 6. The user acts, replies, or adds more information.
 7. The profile and next brief evolve over time.
 
@@ -99,7 +104,7 @@ Within 3-5 minutes, a new user should receive:
 
 - an initial understanding summary
 - one working hook or profile synthesis
-- one top priority for this week
+- one top priority for this month
 - one or more missing-information prompts
 
 ## 7. Key Surfaces
@@ -111,7 +116,7 @@ The main application surface. It includes:
 - the conversation stream
 - upload and add-material controls
 - summaries of newly extracted information
-- the latest Weekly Brief
+- the latest Monthly Brief
 - follow-up prompts and action items
 
 ### Material Inbox
@@ -130,12 +135,12 @@ A supporting surface where users can:
 
 A read-mostly system summary of what is currently known, inferred, missing, stale, or conflicting.
 
-## 8. Weekly Brief Definition
+## 8. Monthly Brief Definition
 
 Each brief should include:
 
 1. What changed
-2. What matters this week
+2. What matters now
 3. Top 3 actions
 4. Risks
 5. Why this advice
@@ -160,7 +165,7 @@ The system may infer profile fields, but it must not silently overwrite critical
 
 When new material is processed, the user should see a summary like:
 
-> I found a new SAT Math score of 760 and updated your testing profile. This strengthens your readiness for higher-selectivity targets and may change next week's recommendations.
+> I found a new SAT Math score of 760 and updated your testing profile. This strengthens your readiness for higher-selectivity targets and may change your next round of recommendations.
 
 If information is uncertain or conflicting, the system should explicitly ask for confirmation.
 
@@ -182,7 +187,7 @@ The MVP does not attempt to do the following:
 - A first-time user can receive useful initial guidance without filling a long form.
 - A user can add new material at any time without losing conversation continuity.
 - New material results in a visible update to profile understanding or recommendations.
-- The Weekly Brief is understandable and actionable by both student and parent.
+- The Monthly Brief is understandable and actionable by both student and parent.
 
 ### Demo Success
 
@@ -199,7 +204,7 @@ The demo must show:
 - The experience could feel too vague if the interview is too open-ended.
 - The system could feel untrustworthy if patches are applied opaquely.
 - Material parsing could feel weak if the UI promises more automation than the MVP actually provides.
-- Weekly Brief could become generic if profile state is too shallow.
+- Monthly Brief could become generic if profile state is too shallow.
 
 ## 14. Open Questions For Later Phases
 

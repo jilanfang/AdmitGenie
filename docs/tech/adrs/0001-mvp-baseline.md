@@ -9,9 +9,9 @@ Accepted
 The AdmitGenie MVP is defined as:
 
 - an AI-native admissions coach
-- for North America-focused 11th-grade families
+- for North America-focused 9th-11th grade families
 - using a Coach Inbox
-- centered on a Weekly Brief
+- centered on a Monthly Brief
 
 ## Why
 
@@ -19,7 +19,7 @@ This is the narrowest version of the product that still expresses the core idea:
 
 - persistent coaching
 - evolving profile state
-- actionable weekly guidance
+- actionable month-scale guidance
 
 ## Consequences
 

@@ -6,3 +6,6 @@ dist
 *.log
 .env*
 !.env.example
+.DS_Store
+.superpowers/
+.task-archive/

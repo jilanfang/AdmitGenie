@@ -7,7 +7,7 @@
 - persistent material inbox
 - structured profile state with field statuses
 - profile patch proposal and confirmation flow
-- Weekly Brief generation
+- Monthly Brief generation
 - visible explanation of how new materials affect profile and recommendations
 
 ## Should Wait

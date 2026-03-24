@@ -51,7 +51,7 @@ For every submitted material item, the system should visibly report:
 - what facts it extracted
 - what profile fields may change
 - whether confirmation is needed
-- whether this changes the Weekly Brief
+- whether this changes the Monthly Brief
 
 ## Example Update Pattern
 

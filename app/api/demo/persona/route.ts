@@ -16,7 +16,12 @@ export async function POST(request: Request) {
   try {
     return Response.json({
       ok: true,
-      data: await switchDemoPersonaFromPersistence(payload.slug),
+      data: await switchDemoPersonaFromPersistence(
+        payload.slug,
+        (payload as { workspace?: string }).workspace ??
+          new URL(request.url).searchParams.get("workspace") ??
+          undefined,
+      ),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to switch demo persona.";

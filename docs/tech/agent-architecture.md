@@ -109,7 +109,7 @@ UPDATE NOTIFIER
 
 ### Responsibility
 
-- generate the Weekly Brief
+- generate the Monthly Brief
 - prioritize actions
 - explain why each recommendation matters now
 
@@ -122,7 +122,7 @@ UPDATE NOTIFIER
 
 ### Outputs
 
-- `WeeklyBrief`
+- `MonthlyBrief`
 - `ActionItem[]`
 - possible follow-up prompts
 
@@ -137,7 +137,7 @@ UPDATE NOTIFIER
 ### Responsibility
 
 - decide what should surface immediately
-- decide what should wait for the next brief
+- decide what should wait for the next scheduled brief
 - summarize profile changes after new materials
 
 ### Inputs

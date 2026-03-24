@@ -4,7 +4,7 @@
 
 AdmitGenie MVP is a Vercel-first web application with one core interaction loop:
 
-`conversation + material ingestion + profile state + weekly brief`
+`conversation + material ingestion + profile state + monthly brief`
 
 ## System Context
 
@@ -75,7 +75,7 @@ Responsibilities:
 Responsibilities:
 
 - combine profile state, school context, and recent changes
-- produce Weekly Brief content
+- produce Monthly Brief content
 - trigger immediate updates when needed
 
 ## Main Data Flow
@@ -172,6 +172,7 @@ This layer is not part of MVP deployment.
 - Neon for relational storage
 - Blob for files
 - Cron for scheduled brief generation
+- optional shared-demo access gate plus workspace-scoped demo state for hosted walkthroughs
 
 ### MVP Constraint
 

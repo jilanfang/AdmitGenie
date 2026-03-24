@@ -2,13 +2,13 @@
 
 ## Purpose
 
-These personas are not generic marketing archetypes. They are operating profiles for product design, onboarding prompts, weekly brief tone, and demo storytelling.
+These personas are not generic marketing archetypes. They are operating profiles for product design, onboarding prompts, monthly brief tone, and demo storytelling.
 
 All personas below are:
 
 - North America focused
-- 11th-grade household journeys
-- individual users on the front end, usually student plus parent
+- 9th-11th grade household journeys
+- primarily joint student-plus-parent use on the front end, with the same core product also usable by individual counselors as a personal productivity tool
 - good fits for the AI-native `Coach Inbox + Material Inbox` loop
 
 ## 1. Strategic STEM Striver
@@ -68,7 +68,7 @@ All personas below are:
 - Different personas naturally produce different early materials.
 - The inbox should accept this variety without forcing users through rigid categories too early.
 
-### Weekly Brief
+### Monthly Brief
 
 - The brief should feel persona-aware:
   - some users need narrowing

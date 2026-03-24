@@ -120,6 +120,6 @@ The stack supports:
 - AI-native onboarding
 - material inbox
 - explainable profile state
-- weekly brief generation
+- monthly brief generation
 
 without requiring a heavy service topology on day one.

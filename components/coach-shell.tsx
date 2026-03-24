@@ -19,90 +19,6 @@ const MATERIAL_TYPE_OPTIONS: Array<{ value: MaterialType; label: string }> = [
   { value: "freeform_note", label: "Freeform note" },
 ];
 
-const shellStyles = {
-  card: {
-    background: "rgba(255, 250, 240, 0.92)",
-    border: "1px solid var(--line)",
-    borderRadius: "28px",
-    boxShadow: "0 20px 60px rgba(20, 33, 61, 0.08)",
-  },
-  hero: {
-    padding: "28px 28px 20px",
-    display: "grid",
-    gap: "18px",
-  },
-  conversation: {
-    padding: "0 28px 28px",
-    display: "grid",
-    gap: "14px",
-  },
-  rail: {
-    padding: "28px",
-    display: "grid",
-    gap: "18px",
-    alignContent: "start" as const,
-  },
-  chip: {
-    display: "inline-flex",
-    padding: "6px 12px",
-    borderRadius: "999px",
-    border: "1px solid var(--line)",
-    background: "var(--surface-2)",
-    color: "var(--muted)",
-    fontSize: "0.9rem",
-  },
-  primaryButton: {
-    border: "none",
-    borderRadius: "14px",
-    padding: "14px 18px",
-    background: "var(--accent)",
-    color: "#f8f5ee",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  secondaryButton: {
-    border: "1px solid var(--line)",
-    borderRadius: "14px",
-    padding: "12px 16px",
-    background: "transparent",
-    color: "var(--ink)",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  toneCard: {
-    border: "1px solid var(--line)",
-    borderRadius: "20px",
-    padding: "18px",
-    background: "rgba(255,255,255,0.55)",
-  },
-  fieldLabel: {
-    display: "grid",
-    gap: "8px",
-    fontSize: "0.9rem",
-    color: "var(--muted)",
-  },
-  input: {
-    width: "100%",
-    borderRadius: "14px",
-    border: "1px solid var(--line)",
-    background: "rgba(255,255,255,0.92)",
-    color: "var(--ink)",
-    padding: "12px 14px",
-    font: "inherit",
-  },
-  textarea: {
-    width: "100%",
-    minHeight: "132px",
-    borderRadius: "14px",
-    border: "1px solid var(--line)",
-    background: "rgba(255,255,255,0.92)",
-    color: "var(--ink)",
-    padding: "12px 14px",
-    font: "inherit",
-    resize: "vertical" as const,
-  },
-} as const;
-
 type MaterialComposerMode = "closed" | "paste" | "upload";
 
 type MaterialComposerState = {
@@ -121,6 +37,18 @@ const DEFAULT_COMPOSER_STATE: MaterialComposerState = {
   error: null,
 };
 
+const composerButtonStyle = {
+  border: "1px solid var(--chat-line)",
+  borderRadius: "999px",
+  background: "var(--chat-surface)",
+  color: "var(--chat-ink)",
+  padding: "10px 14px",
+  cursor: "pointer",
+  fontWeight: 600,
+} as const;
+
+const WORKSPACE_STORAGE_KEY = "admitgenie-workspace";
+
 export function CoachShell() {
   const [state, setState] = useState<CoachSnapshot | null>(null);
   const [demoPersona, setDemoPersona] = useState<DemoPersonaConfig | null>(null);
@@ -129,16 +57,21 @@ export function CoachShell() {
   const [isApplyingMaterial, setIsApplyingMaterial] = useState(false);
   const [isSendingConversation, setIsSendingConversation] = useState(false);
   const [isSwitchingPersona, setIsSwitchingPersona] = useState(false);
+  const [isBriefOpen, setIsBriefOpen] = useState(false);
+  const [conversationDraft, setConversationDraft] = useState("");
   const [materialComposerMode, setMaterialComposerMode] =
     useState<MaterialComposerMode>("closed");
   const [materialComposer, setMaterialComposer] =
     useState<MaterialComposerState>(DEFAULT_COMPOSER_STATE);
+  const [workspaceCode, setWorkspaceCode] = useState("");
 
   useEffect(() => {
     let active = true;
+    const workspace = ensureWorkspaceCode();
+    setWorkspaceCode(workspace);
 
     const loadState = async () => {
-      const payload = await fetchDemoState();
+      const payload = await fetchDemoState(workspace);
 
       if (!active) {
         return;
@@ -165,14 +98,30 @@ export function CoachShell() {
         type: "test_score",
         title: "March SAT",
         content: "New SAT update: Math 760, Reading and Writing 730.",
-      });
+      }, workspaceCode);
       setState(nextState);
     } finally {
       setIsApplyingMaterial(false);
     }
   };
 
-  const sharePlanningUpdate = async () => {
+  const reloadState = async (workspace: string) => {
+    setIsLoading(true);
+
+    try {
+      const payload = await fetchDemoState(workspace);
+      setState(payload.data?.state ?? null);
+      setDemoPersona(payload.data?.demoPersona ?? null);
+      setDeployment(payload.data?.deployment ?? null);
+      setIsBriefOpen(false);
+      setConversationDraft("");
+      closeMaterialComposer();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const sendConversation = async (message: string) => {
     setIsSendingConversation(true);
 
     try {
@@ -182,7 +131,8 @@ export function CoachShell() {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          message: "We want selective engineering programs but do not have a school list yet.",
+          message,
+          workspace: workspaceCode,
         }),
       });
       const payload = (await response.json()) as {
@@ -191,9 +141,21 @@ export function CoachShell() {
         };
       };
       setState(payload.data?.state ?? null);
+      setIsBriefOpen(false);
+      setConversationDraft("");
     } finally {
       setIsSendingConversation(false);
     }
+  };
+
+  const handleConversationSubmit = async () => {
+    const message = conversationDraft.trim();
+
+    if (message.length === 0) {
+      return;
+    }
+
+    await sendConversation(message);
   };
 
   const switchPersona = async (slug: string) => {
@@ -205,15 +167,31 @@ export function CoachShell() {
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ slug }),
+        body: JSON.stringify({ slug, workspace: workspaceCode }),
       });
       const payload = (await response.json()) as DemoStatePayload;
       setState(payload.data?.state ?? null);
       setDemoPersona(payload.data?.demoPersona ?? null);
+      setIsBriefOpen(false);
+      setConversationDraft("");
       closeMaterialComposer();
     } finally {
       setIsSwitchingPersona(false);
     }
+  };
+
+  const leaveDemo = async () => {
+    await fetch("/api/demo/logout", {
+      method: "POST",
+    });
+    window.location.reload();
+  };
+
+  const startNewChat = async () => {
+    const nextWorkspace = createWorkspaceCode();
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, nextWorkspace);
+    setWorkspaceCode(nextWorkspace);
+    await reloadState(nextWorkspace);
   };
 
   const openMaterialComposer = (mode: Exclude<MaterialComposerMode, "closed">) => {
@@ -229,9 +207,7 @@ export function CoachShell() {
     setMaterialComposer(DEFAULT_COMPOSER_STATE);
   };
 
-  const updateMaterialComposer = (
-    next: Partial<MaterialComposerState>,
-  ) => {
+  const updateMaterialComposer = (next: Partial<MaterialComposerState>) => {
     setMaterialComposer((current) => ({
       ...current,
       ...next,
@@ -278,8 +254,11 @@ export function CoachShell() {
         type: materialComposer.type,
         title,
         content,
-      });
+      }, workspaceCode);
       setState(nextState);
+      if (nextState?.materialAnalysis[0]?.patchStatus) {
+        setIsBriefOpen(false);
+      }
       closeMaterialComposer();
     } finally {
       setIsApplyingMaterial(false);
@@ -289,442 +268,472 @@ export function CoachShell() {
   if (isLoading || !state) {
     return (
       <main className="coach-shell-page">
-        <div style={{ maxWidth: "1400px", margin: "0 auto", color: "var(--muted)" }}>
-          Loading Coach Inbox...
-        </div>
+        <div className="coach-shell-loading">Loading AdmitGenie...</div>
       </main>
     );
   }
 
+  const visibleFields = [
+    state.profileFields.gradeLevel,
+    {
+      label: "Direction",
+      value: state.studentProfile.majorDirection ?? "No major direction confirmed yet",
+      status: "known" as const,
+    },
+    state.profileFields.currentFocus,
+    state.profileFields.testingStatus,
+    state.profileFields.schoolList,
+    state.profileFields.applicationTiming,
+  ];
+  const missingFields = Object.values(state.profileFields).filter(
+    (field) => field.status !== "known",
+  );
+  const recentMaterials = state.materials.slice(0, 3);
+  const latestMaterialAnalysis = state.materialAnalysis[0] ?? null;
+  const shouldShowBriefEntry = latestMaterialAnalysis !== null;
+
   return (
     <main className="coach-shell-page">
-      <div className="coach-shell-frame">
-        <section style={shellStyles.card}>
-          <div style={shellStyles.hero}>
-            <span style={shellStyles.chip}>AI-native guided interview</span>
-            <div style={{ display: "grid", gap: "10px" }}>
-              <h1
-                style={{
-                  margin: 0,
-                  fontSize: "clamp(2.6rem, 4vw, 4.3rem)",
-                  lineHeight: 0.95,
-                  letterSpacing: "-0.04em",
-                }}
-              >
-                Coach Inbox
-              </h1>
-              <p
-                style={{
-                  margin: 0,
-                  maxWidth: "52rem",
-                  color: "var(--muted)",
-                  fontSize: "1.06rem",
-                  lineHeight: 1.6,
-                }}
-              >
-                AdmitGenie starts as a guided conversation, not a form. The coach
-                keeps a hidden structured profile, explains what it knows, and
-                updates weekly guidance when new materials arrive.
-              </p>
+      <div className="chat-shell">
+        <aside className="chat-sidebar">
+          <div className="chat-sidebar__brand">
+            <div className="chat-sidebar__logo">AG</div>
+            <div>
+              <div className="chat-sidebar__title">AdmitGenie</div>
+              <div className="chat-sidebar__subtitle">AI admissions coach</div>
             </div>
-            {demoPersona?.canSwitch ? (
-              <label style={{ ...shellStyles.fieldLabel, maxWidth: "22rem" }}>
-                <span>Demo persona</span>
-                <select
-                  aria-label="Demo persona"
-                  value={demoPersona.selectedSlug}
-                  disabled={isSwitchingPersona}
-                  onChange={(event) => void switchPersona(event.target.value)}
-                  style={shellStyles.input}
-                >
-                  {demoPersona.options.map((persona) => (
-                    <option key={persona.slug} value={persona.slug}>
-                      {persona.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
+          </div>
+
+          <button
+            className="chat-sidebar__new-chat"
+            type="button"
+            onClick={() => void startNewChat()}
+          >
+            New chat
+          </button>
+
+          <button
+            className="chat-sidebar__secondary-action"
+            type="button"
+            onClick={() => void leaveDemo()}
+          >
+            Leave demo
+          </button>
+
+          {demoPersona?.canSwitch ? (
+            <label className="chat-sidebar__control">
+              <span>Demo persona</span>
+              <select
+                aria-label="Demo persona"
+                value={demoPersona.selectedSlug}
+                disabled={isSwitchingPersona}
+                onChange={(event) => void switchPersona(event.target.value)}
+              >
+                {demoPersona.options.map((persona) => (
+                  <option key={persona.slug} value={persona.slug}>
+                    {persona.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          <div className="chat-sidebar__section">
+            <div className="chat-sidebar__section-label">Recent chats</div>
+            <div className="chat-thread chat-thread--active">
+              First admissions plan
+            </div>
+            {demoPersona?.options.slice(0, 2).map((persona) => (
+              <div key={persona.slug} className="chat-thread">
+                {persona.name}
+              </div>
+            ))}
+          </div>
+
+          <div className="chat-sidebar__section">
+            <div className="chat-sidebar__section-label">Workspace</div>
+            <div className="chat-sidebar__workspace-code">{workspaceCode}</div>
+          </div>
+
+          <div className="chat-sidebar__section">
+            <div className="chat-sidebar__section-label">Demo status</div>
+            <div className="chat-sidebar__meta-card">
+              <strong>
+                {deployment?.readyForSharedDemo ? "Durable Vercel demo" : "Ephemeral local demo"}
+              </strong>
+              <span>
+                {deployment?.readyForSharedDemo
+                  ? "State is persisted across sessions for this workspace."
+                  : "State is isolated by workspace, but memory mode resets when the process restarts."}
+              </span>
+            </div>
+          </div>
+
+          {demoPersona ? (
+            <div className="chat-sidebar__section">
+              <div className="chat-sidebar__section-label">Scenario</div>
+              <div className="chat-sidebar__meta-card">
+                <strong>
+                  {demoPersona.options.find((persona) => persona.slug === demoPersona.selectedSlug)
+                    ?.name ?? "Current scenario"}
+                </strong>
+                <span>
+                  {demoPersona.options.find((persona) => persona.slug === demoPersona.selectedSlug)
+                    ?.summary ?? "AI-native admissions coaching demo scenario."}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="chat-sidebar__footer">
+            {state.studentProfile.firstName ?? "Student"}
+          </div>
+        </aside>
+
+        <section className="chat-main">
+          <header className="chat-main__header">
+            <div className="chat-main__eyebrow">Coach-led intake</div>
+            <h1 className="chat-main__title">Build your first admissions plan.</h1>
+            <p className="chat-main__subtitle">
+              I can help you build your first admissions plan through conversation,
+              not a giant intake form. Start with your grade, what you&apos;re aiming
+              for, and what feels most unclear right now.
+            </p>
             {deployment && !deployment.readyForSharedDemo ? (
-              <article
-                style={{
-                  ...shellStyles.toneCard,
-                  borderColor: "rgba(166, 71, 42, 0.24)",
-                  background:
-                    "linear-gradient(180deg, rgba(255,245,236,0.96), rgba(255,255,255,0.9))",
-                }}
+              <div className="chat-main__warning">
+                <strong>Ephemeral demo mode</strong>
+                <span>{deployment.blocker}</span>
+              </div>
+            ) : null}
+            <div>
+              <button
+                style={composerButtonStyle}
+                type="button"
+                onClick={() => setIsBriefOpen((current) => !current)}
               >
-                <div style={{ fontSize: "0.84rem", color: "var(--alert)" }}>
-                  Ephemeral demo mode
-                </div>
-                <p style={{ margin: "8px 0 0", color: "var(--muted)", lineHeight: 1.6 }}>
-                  {deployment.blocker}
+                {isBriefOpen ? "Hide current brief" : "View current brief"}
+              </button>
+            </div>
+          </header>
+
+          <div className="chat-main__stream">
+            {state.conversation.map((message, index) => {
+                const isUser = message.startsWith("Family:");
+                const bubbleClass = isUser
+                  ? "chat-bubble chat-bubble--user"
+                  : "chat-bubble chat-bubble--coach";
+                const isOpening = index === 0;
+
+                return (
+                  <article key={`${message}-${index}`} className={bubbleClass}>
+                    <div className="chat-bubble__label">
+                      {isUser ? "You" : isOpening ? "Coach opening" : "Coach"}
+                    </div>
+                    <p>{message}</p>
+                  </article>
+                );
+              })}
+
+            {latestMaterialAnalysis ? (
+              <article className="chat-bubble chat-bubble--system">
+                <div className="chat-bubble__label">Material update</div>
+                <p>{state.patches[0]?.summary}</p>
+                <p className="chat-bubble__meta">
+                  Patch status: {latestMaterialAnalysis.patchStatus}
                 </p>
+                <p className="chat-bubble__meta">
+                  Affected fields: {latestMaterialAnalysis.affectedFields.join(", ")}
+                </p>
+                {latestMaterialAnalysis.extractedFacts.length > 0 ? (
+                  <p className="chat-bubble__meta">
+                    Extracted facts: {latestMaterialAnalysis.extractedFacts.join(", ")}
+                  </p>
+                ) : null}
+                <p className="chat-bubble__meta">{latestMaterialAnalysis.profileImpact}</p>
+                {shouldShowBriefEntry ? (
+                  <button
+                    className="chat-composer__send"
+                    type="button"
+                    onClick={() => setIsBriefOpen((current) => !current)}
+                  >
+                    {isBriefOpen ? "Hide latest brief" : "View latest brief"}
+                  </button>
+                ) : null}
               </article>
             ) : null}
-            <div className="coach-shell-summary-grid">
-              <article
-                style={{
-                  ...shellStyles.toneCard,
-                  background:
-                    "linear-gradient(135deg, rgba(247,231,203,0.88), rgba(255,255,255,0.82))",
-                }}
+
+            {isBriefOpen ? (
+              <article className="chat-bubble chat-bubble--system">
+                <div className="chat-bubble__label">Monthly brief</div>
+                <p><strong>What changed</strong></p>
+                <p>{state.weeklyBrief.whatChanged}</p>
+                <p><strong>What matters now</strong></p>
+                <p>{state.weeklyBrief.whatMatters}</p>
+                <p><strong>Top actions</strong></p>
+                <p>{state.weeklyBrief.topActions.join(" ")}</p>
+                <p><strong>Risks</strong></p>
+                <p>{state.weeklyBrief.risks.join(" ")}</p>
+                <p><strong>Why this advice</strong></p>
+                <p>{state.weeklyBrief.whyThisAdvice}</p>
+              </article>
+            ) : null}
+          </div>
+
+          <div className="chat-composer">
+            <div className="chat-composer__tools">
+              <button
+                style={composerButtonStyle}
+                type="button"
+                onClick={() => openMaterialComposer("upload")}
               >
-                <div style={{ fontSize: "0.84rem", color: "var(--muted)" }}>Student</div>
-                <div style={{ marginTop: "6px", fontWeight: 800, fontSize: "1.24rem" }}>
-                  {state.studentProfile.firstName ?? "Student profile"}
-                </div>
-                <div style={{ marginTop: "8px", color: "var(--muted)", lineHeight: 1.6 }}>
-                  {state.studentProfile.gradeLevel}
-                  {state.studentProfile.graduationYear
-                    ? ` • Class of ${state.studentProfile.graduationYear}`
-                    : ""}
-                </div>
-                <div style={{ marginTop: "12px", fontSize: "0.92rem", lineHeight: 1.6 }}>
-                  {state.studentProfile.majorDirection ?? "No major direction confirmed yet"}
-                </div>
-              </article>
-              <article style={shellStyles.toneCard}>
-                <div style={{ fontSize: "0.84rem", color: "var(--muted)" }}>Household</div>
-                <div style={{ marginTop: "6px", fontWeight: 700, fontSize: "1rem" }}>
-                  {state.household.timezone}
-                </div>
-                <div
-                  style={{
-                    marginTop: "10px",
-                    fontSize: "0.92rem",
-                    color: "var(--muted)",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {state.household.goalsSummary ?? "No household goal summary confirmed yet"}
-                </div>
-              </article>
-              <article style={shellStyles.toneCard}>
-                <div style={{ fontSize: "0.84rem", color: "var(--muted)" }}>Coach posture</div>
-                <div style={{ marginTop: "6px", fontWeight: 700, fontSize: "1rem" }}>
-                  AI-native intake
-                </div>
-                <div
-                  style={{
-                    marginTop: "10px",
-                    fontSize: "0.92rem",
-                    color: "var(--muted)",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  Hidden structured profile, visible explanations, and progressive updates as
-                  new materials arrive.
-                </div>
-              </article>
+                Upload file
+              </button>
+              <button
+                style={composerButtonStyle}
+                type="button"
+                onClick={() => openMaterialComposer("paste")}
+              >
+                Paste update
+              </button>
+              <button
+                style={composerButtonStyle}
+                type="button"
+                onClick={() => void applySatUpdate()}
+              >
+                {isApplyingMaterial ? "Updating..." : "Try a SAT update"}
+              </button>
             </div>
-            <div className="coach-shell-profile-grid">
-              {Object.values(state.profileFields).map((field) => (
-                <article key={field.label} style={shellStyles.toneCard}>
-                  <div style={{ fontSize: "0.84rem", color: "var(--muted)" }}>{field.label}</div>
-                  <div
-                    style={{
-                      marginTop: "6px",
-                      fontWeight: 700,
-                      fontSize: "1rem",
-                    }}
-                  >
-                    {field.value}
+
+            <div className="chat-composer__surface">
+              <label className="chat-composer__input-wrap">
+                <span className="sr-only">Message coach</span>
+                <textarea
+                  aria-label="Message coach"
+                  className="chat-composer__input"
+                  value={conversationDraft}
+                  onChange={(event) => setConversationDraft(event.target.value)}
+                  placeholder="Tell the coach what grade you're in, what you're aiming for, and what feels most uncertain."
+                />
+              </label>
+              <button
+                className="chat-composer__send"
+                type="button"
+                onClick={() => void handleConversationSubmit()}
+                disabled={isSendingConversation}
+              >
+                {isSendingConversation ? "Sending..." : "Send message"}
+              </button>
+            </div>
+
+            {materialComposerMode !== "closed" ? (
+              <div className="chat-material-sheet">
+                <div className="chat-material-sheet__header">
+                  <strong>
+                    {materialComposerMode === "upload"
+                      ? "Upload a text file"
+                      : "Paste a new material update"}
+                  </strong>
+                  <button type="button" onClick={closeMaterialComposer}>
+                    Cancel
+                  </button>
+                </div>
+
+                <div className="chat-material-sheet__grid">
+                  <label>
+                    <span>Material type</span>
+                    <select
+                      aria-label="Material type"
+                      value={materialComposer.type}
+                      onChange={(event) =>
+                        updateMaterialComposer({
+                          type: event.target.value as MaterialType,
+                        })
+                      }
+                    >
+                      {MATERIAL_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>Title</span>
+                    <input
+                      aria-label="Title"
+                      value={materialComposer.title}
+                      onChange={(event) =>
+                        updateMaterialComposer({
+                          title: event.target.value,
+                        })
+                      }
+                      placeholder="Name this update"
+                    />
+                  </label>
+                </div>
+
+                {materialComposerMode === "upload" ? (
+                  <label className="chat-material-sheet__upload">
+                    <span>File upload</span>
+                    <input
+                      aria-label="File upload"
+                      type="file"
+                      accept=".txt,.md,.csv,.json"
+                      onChange={(event) => void handleFileUpload(event)}
+                    />
+                  </label>
+                ) : null}
+
+                <label className="chat-material-sheet__field">
+                  <span>Material content</span>
+                  <textarea
+                    aria-label="Material content"
+                    value={materialComposer.content}
+                    onChange={(event) =>
+                      updateMaterialComposer({
+                        content: event.target.value,
+                      })
+                    }
+                    placeholder="Paste a score update, activity note, school list, or family context."
+                  />
+                </label>
+
+                {materialComposer.fileName ? (
+                  <div className="chat-material-sheet__hint">
+                    Loaded file: {materialComposer.fileName}
                   </div>
-                  <div
-                    style={{
-                      marginTop: "10px",
-                      fontSize: "0.84rem",
-                      color: field.status === "known" ? "var(--accent)" : "var(--warm)",
-                    }}
-                  >
+                ) : null}
+
+                {materialComposer.error ? (
+                  <div className="chat-material-sheet__error">
+                    {materialComposer.error}
+                  </div>
+                ) : null}
+
+                <button
+                  className="chat-material-sheet__submit"
+                  type="button"
+                  onClick={() => void handleMaterialSubmit()}
+                >
+                  {isApplyingMaterial ? "Adding..." : "Add material"}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <aside className="chat-notebook">
+          <section className="chat-notebook__card">
+            <div className="chat-notebook__label">What I know</div>
+            <div className="chat-notebook__list">
+              {visibleFields.map((field) => (
+                <article key={field.label} className="chat-notebook__item">
+                  <div className="chat-notebook__item-label">{field.label}</div>
+                  <div className="chat-notebook__item-value">{field.value}</div>
+                  <div className={`chat-status chat-status--${field.status}`}>
                     {field.status}
                   </div>
                 </article>
               ))}
             </div>
-          </div>
+          </section>
 
-          <div style={shellStyles.conversation}>
-            {state.conversation.map((message, index) => (
-              <article
-                key={`${message}-${index}`}
-                style={{
-                  ...shellStyles.toneCard,
-                  background:
-                    index === 0
-                      ? "linear-gradient(135deg, rgba(207,231,223,0.8), rgba(255,255,255,0.8))"
-                      : "rgba(255,255,255,0.52)",
-                }}
-              >
-                <div style={{ fontSize: "0.84rem", color: "var(--muted)" }}>
-                  {index === 0 ? "Coach update" : "Conversation"}
-                </div>
-                <p
-                  style={{
-                    margin: "8px 0 0",
-                    lineHeight: 1.6,
-                    fontSize: "1rem",
-                  }}
-                >
-                  {message}
-                </p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <aside style={shellStyles.card}>
-          <div style={shellStyles.rail}>
-            <div style={{ display: "grid", gap: "8px" }}>
-              <span style={shellStyles.chip}>Material Inbox</span>
-              <h2 style={{ margin: 0, fontSize: "2rem", lineHeight: 1 }}>Weekly Brief</h2>
-              <p style={{ margin: 0, color: "var(--muted)", lineHeight: 1.6 }}>
-                The right rail shows how a new material changes the hidden profile and
-                reshapes the brief.
-              </p>
+          <section className="chat-notebook__card">
+            <div className="chat-notebook__label">What’s missing</div>
+            <div className="chat-notebook__list">
+              {missingFields.slice(0, 3).map((field) => (
+                <article key={field.label} className="chat-notebook__item">
+                  <div className="chat-notebook__item-label">{field.label}</div>
+                  <div className="chat-notebook__item-value">{field.value}</div>
+                </article>
+              ))}
             </div>
+          </section>
 
-            <article style={shellStyles.toneCard}>
-              <strong style={{ display: "block", fontSize: "1rem" }}>What changed</strong>
-              <p style={{ margin: "10px 0 0", color: "var(--muted)", lineHeight: 1.6 }}>
-                {state.weeklyBrief.whatChanged}
-              </p>
-            </article>
-
-            <article style={shellStyles.toneCard}>
-              <strong style={{ display: "block", fontSize: "1rem" }}>What matters</strong>
-              <p style={{ margin: "10px 0 0", color: "var(--muted)", lineHeight: 1.6 }}>
-                {state.weeklyBrief.whatMatters}
-              </p>
-            </article>
-
-            <article style={shellStyles.toneCard}>
-              <strong style={{ display: "block", fontSize: "1rem" }}>Top actions</strong>
-              <ol style={{ margin: "10px 0 0", paddingLeft: "18px", lineHeight: 1.8 }}>
-                {state.weeklyBrief.topActions.map((action) => (
-                  <li key={action}>{action}</li>
+          <section className="chat-notebook__card">
+            <div className="chat-notebook__label">Add material</div>
+            <div className="chat-notebook__actions">
+              <button
+                style={composerButtonStyle}
+                type="button"
+                onClick={() => openMaterialComposer("upload")}
+              >
+                Upload file
+              </button>
+              <button
+                style={composerButtonStyle}
+                type="button"
+                onClick={() => openMaterialComposer("paste")}
+              >
+                Paste update
+              </button>
+            </div>
+            {recentMaterials.length > 0 ? (
+              <div className="chat-notebook__recent">
+                {recentMaterials.map((material) => (
+                  <div key={material.id} className="chat-notebook__recent-item">
+                    <strong>{material.title}</strong>
+                    <span>{material.type.replaceAll("_", " ")}</span>
+                  </div>
                 ))}
-              </ol>
-            </article>
-
-            <article style={shellStyles.toneCard}>
-              <strong style={{ display: "block", fontSize: "1rem" }}>Why this advice</strong>
-              <p style={{ margin: "10px 0 0", color: "var(--muted)", lineHeight: 1.6 }}>
-                {state.weeklyBrief.whyThisAdvice}
-              </p>
-            </article>
-
-            <article
-              style={{
-                ...shellStyles.toneCard,
-                display: "grid",
-                gap: "12px",
-                borderColor: "rgba(13, 91, 80, 0.3)",
-                background:
-                  "linear-gradient(180deg, rgba(207,231,223,0.72), rgba(255,255,255,0.88))",
-              }}
-            >
-              <div>
-                <strong style={{ display: "block", fontSize: "1rem" }}>Material inbox</strong>
-                <p style={{ margin: "8px 0 0", color: "var(--muted)", lineHeight: 1.6 }}>
-                  Add real material updates by pasting notes or uploading a text-based file.
-                  The coach will store the update, generate a patch summary, and refresh the
-                  brief.
-                </p>
               </div>
-              <div className="coach-shell-action-grid">
-                <button style={shellStyles.primaryButton} onClick={applySatUpdate}>
-                  {isApplyingMaterial ? "Updating..." : "Try a SAT update"}
-                </button>
-                <button
-                  style={shellStyles.secondaryButton}
-                  type="button"
-                  onClick={sharePlanningUpdate}
-                >
-                  {isSendingConversation ? "Sending..." : "Share planning update"}
-                </button>
-                <button
-                  style={shellStyles.secondaryButton}
-                  type="button"
-                  onClick={() => openMaterialComposer("upload")}
-                >
-                  Upload file
-                </button>
-                <button
-                  style={shellStyles.secondaryButton}
-                  type="button"
-                  onClick={() => openMaterialComposer("paste")}
-                >
-                  Paste update
-                </button>
+            ) : null}
+          </section>
+
+          {latestMaterialAnalysis ? (
+            <section className="chat-notebook__card">
+              <div className="chat-notebook__label">Latest material update</div>
+              <div className="chat-notebook__list">
+                <article className="chat-notebook__item">
+                  <div className="chat-notebook__item-label">Patch status</div>
+                  <div className="chat-notebook__item-value">
+                    {latestMaterialAnalysis.patchStatus}
+                  </div>
+                </article>
+                <article className="chat-notebook__item">
+                  <div className="chat-notebook__item-label">Affected fields</div>
+                  <div className="chat-notebook__item-value">
+                    {latestMaterialAnalysis.affectedFields.join(", ")}
+                  </div>
+                </article>
               </div>
+            </section>
+          ) : null}
 
-              {materialComposerMode !== "closed" ? (
-                <div className="coach-shell-composer" style={shellStyles.toneCard}>
-                  <div style={{ display: "grid", gap: "8px" }}>
-                    <strong style={{ fontSize: "1rem" }}>
-                      {materialComposerMode === "upload"
-                        ? "Upload a text file"
-                        : "Paste a new material update"}
-                    </strong>
-                    <p style={{ margin: 0, color: "var(--muted)", lineHeight: 1.6 }}>
-                      MVP input layer: accept structured notes now, save OCR and richer parsing
-                      for later.
-                    </p>
-                  </div>
-
-                  <div className="coach-shell-composer-grid">
-                    <label style={shellStyles.fieldLabel}>
-                      <span>Material type</span>
-                      <select
-                        aria-label="Material type"
-                        value={materialComposer.type}
-                        onChange={(event) =>
-                          updateMaterialComposer({
-                            type: event.target.value as MaterialType,
-                          })
-                        }
-                        style={shellStyles.input}
-                      >
-                        {MATERIAL_TYPE_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label style={shellStyles.fieldLabel}>
-                      <span>Title</span>
-                      <input
-                        aria-label="Title"
-                        value={materialComposer.title}
-                        onChange={(event) =>
-                          updateMaterialComposer({
-                            title: event.target.value,
-                          })
-                        }
-                        placeholder="Name this update"
-                        style={shellStyles.input}
-                      />
-                    </label>
-                  </div>
-
-                  {materialComposerMode === "upload" ? (
-                    <label style={shellStyles.fieldLabel}>
-                      <span>File upload</span>
-                      <input
-                        aria-label="File upload"
-                        type="file"
-                        accept=".txt,.md,.csv,.json"
-                        onChange={(event) => void handleFileUpload(event)}
-                        style={shellStyles.input}
-                      />
-                      <span style={{ fontSize: "0.82rem" }}>
-                        Text-based files only for MVP. PDF and OCR parsing come later.
-                      </span>
-                    </label>
-                  ) : null}
-
-                  <label style={shellStyles.fieldLabel}>
-                    <span>Material content</span>
-                    <textarea
-                      aria-label="Material content"
-                      value={materialComposer.content}
-                      onChange={(event) =>
-                        updateMaterialComposer({
-                          content: event.target.value,
-                        })
-                      }
-                      placeholder="Paste a score update, activity note, school list, or family context."
-                      style={shellStyles.textarea}
-                    />
-                  </label>
-
-                  {materialComposer.fileName ? (
-                    <div style={{ color: "var(--muted)", fontSize: "0.84rem" }}>
-                      Loaded file: {materialComposer.fileName}
-                    </div>
-                  ) : null}
-
-                  {materialComposer.error ? (
-                    <div style={{ color: "var(--alert)", fontSize: "0.9rem" }}>
-                      {materialComposer.error}
-                    </div>
-                  ) : null}
-
-                  <div className="coach-shell-action-grid">
-                    <button
-                      style={shellStyles.primaryButton}
-                      type="button"
-                      onClick={() => void handleMaterialSubmit()}
-                    >
-                      {isApplyingMaterial ? "Adding..." : "Add material"}
-                    </button>
-                    <button
-                      style={shellStyles.secondaryButton}
-                      type="button"
-                      onClick={closeMaterialComposer}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-            </article>
-
-            {state.materials.length > 0 ? (
-              <article style={shellStyles.toneCard}>
-                <strong style={{ display: "block", fontSize: "1rem" }}>Recent materials</strong>
-                <div style={{ display: "grid", gap: "10px", marginTop: "10px" }}>
-                  {state.materials.slice(0, 3).map((material) => (
-                    <div key={material.id}>
-                      <div style={{ fontWeight: 700 }}>{material.title}</div>
-                      <div style={{ color: "var(--muted)", fontSize: "0.84rem", marginTop: "4px" }}>
-                        {material.type.replaceAll("_", " ")}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </article>
-            ) : null}
-
-            {state.patches.length > 0 ? (
-              <article style={shellStyles.toneCard}>
-                <strong style={{ display: "block", fontSize: "1rem" }}>Latest patch</strong>
-                <p style={{ margin: "10px 0 0", lineHeight: 1.6 }}>
-                  {state.patches[0]?.summary}
-                </p>
-                <p
-                  style={{
-                    margin: "8px 0 0",
-                    color: "var(--muted)",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {state.patches[0]?.impact}
-                </p>
-              </article>
-            ) : null}
-          </div>
+          {latestMaterialAnalysis ? (
+            <section className="chat-notebook__card">
+              <div className="chat-notebook__label">Current priorities</div>
+              <div className="chat-notebook__list">
+                {state.weeklyBrief.topActions.slice(0, 2).map((action) => (
+                  <article key={action} className="chat-notebook__item">
+                    <div className="chat-notebook__item-value">{action}</div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </aside>
       </div>
     </main>
   );
 }
 
-async function submitMaterial(draft: MaterialDraft): Promise<CoachSnapshot | null> {
+async function submitMaterial(
+  draft: MaterialDraft,
+  workspace: string,
+): Promise<CoachSnapshot | null> {
   const response = await fetch("/api/demo/materials", {
     method: "POST",
     headers: {
       "content-type": "application/json",
     },
-    body: JSON.stringify({ draft }),
+    body: JSON.stringify({ draft, workspace }),
   });
   const payload = (await response.json()) as {
     data?: {
       state: CoachSnapshot;
+      materialAnalysis?: CoachSnapshot["materialAnalysis"][number] | null;
     };
   };
 
@@ -739,7 +748,23 @@ type DemoStatePayload = {
   };
 };
 
-async function fetchDemoState(): Promise<DemoStatePayload> {
-  const response = await fetch("/api/demo/state");
+async function fetchDemoState(workspace: string): Promise<DemoStatePayload> {
+  const response = await fetch(`/api/demo/state?workspace=${encodeURIComponent(workspace)}`);
   return (await response.json()) as DemoStatePayload;
+}
+
+function ensureWorkspaceCode(): string {
+  const existing = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+
+  if (existing && existing.trim().length > 0) {
+    return existing;
+  }
+
+  const next = createWorkspaceCode();
+  window.localStorage.setItem(WORKSPACE_STORAGE_KEY, next);
+  return next;
+}
+
+function createWorkspaceCode(): string {
+  return `workspace-${Math.random().toString(36).slice(2, 10)}`;
 }

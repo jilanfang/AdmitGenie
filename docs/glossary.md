@@ -3,10 +3,10 @@
 ## Product Terms
 
 **Coach Inbox**  
-The main user surface. It combines conversation, material intake, updates, and weekly guidance in a single persistent view.
+The main user surface. It combines conversation, material intake, updates, and monthly guidance in a single persistent view.
 
-**Weekly Brief**  
-A structured weekly output that tells the user what changed, what matters now, the top actions, key risks, and why the system is recommending them.
+**Monthly Brief**  
+A structured monthly output that tells the user what changed, what matters now, the top actions, key risks, and why the system is recommending them.
 
 **Guided Interview**  
 The AI-native onboarding flow. The system asks a small number of high-leverage questions and progressively builds the user profile.
@@ -44,7 +44,7 @@ A proposed change to the profile based on new evidence. Patches are reviewed, su
 A trace from a profile field or patch back to the original source conversation turn or material item.
 
 **ChangeEvent**  
-A school, timeline, or profile-related change that can affect recommendations and weekly guidance.
+A school, timeline, or profile-related change that can affect recommendations and ongoing guidance.
 
 ## Status Terms
 
@@ -75,7 +75,7 @@ The AI/system role that converts conversations and materials into structured pro
 The ingestion component that classifies, extracts, and summarizes uploaded or pasted materials.
 
 **Brief Composer**  
-The component that turns current profile state, changes, and priorities into the Weekly Brief.
+The component that turns current profile state, changes, and priorities into the Monthly Brief.
 
 **Update Notifier**  
 The component that decides whether new information should trigger an immediate alert, a new prompt, or wait for the next brief.

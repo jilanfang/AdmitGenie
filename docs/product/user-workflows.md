@@ -7,7 +7,7 @@ AdmitGenie MVP supports four primary workflows:
 1. First-time guided onboarding
 2. Ongoing chat-based enrichment
 3. Add new material and update profile state
-4. Review and act on the Weekly Brief
+4. Review and act on the Monthly Brief
 
 ## Workflow 1: First-Time Guided Onboarding
 
@@ -110,10 +110,10 @@ TRIGGER BRIEF UPDATE OR HOLD FOR NEXT BRIEF
 - new school shortlist
 - essay brainstorm note
 
-## Workflow 4: Weekly Brief Review
+## Workflow 4: Monthly Brief Review
 
 ```text
-WEEKLY BRIEF AVAILABLE
+MONTHLY BRIEF AVAILABLE
     |
     v
 USER READS:
@@ -158,7 +158,7 @@ Desired behavior:
 - mark as conflicting
 - do not silently overwrite
 
-### No Meaningful Weekly Change
+### No Meaningful Monthly Change
 
 Desired behavior:
 - still produce a lightweight brief

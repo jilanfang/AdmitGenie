@@ -49,7 +49,7 @@ export const ADMITGENIE_PERSONAS: AdmitGeniePersona[] = [
     primaryUser: "student_family",
     household: {
       timezone: "America/Los_Angeles",
-      goalsSummary: "Selective North America admissions planning for an 11th-grade student.",
+      goalsSummary: "Selective North America admissions planning for a college-bound student in grades 9-11.",
     },
     studentProfile: {
       firstName: "Demo Student",
@@ -67,14 +67,14 @@ export const ADMITGENIE_PERSONAS: AdmitGeniePersona[] = [
       "Testing is still unconfirmed, which weakens reach-versus-target guidance.",
     ],
     coachingOpening:
-      "Welcome back. I am starting from a light profile: an 11th-grade family targeting selective engineering programs, but the school list and testing details still need confirmation.",
+      "Welcome back. I am starting from a light profile: a college-bound family targeting selective engineering programs, but the school list and testing details still need confirmation.",
     guidedInterviewPrompt:
       "Guided interview: tell me your grade, what feels most uncertain right now, whether you have a school list, and how far along you are on testing.",
     weeklyBrief: {
       whatChanged:
         "We have a starter profile for a selective engineering applicant, but no confirmed academic evidence yet.",
       whatMatters:
-        "Confirm testing context and school list so the coach can produce sharper engineering-focused guidance this week.",
+        "Confirm testing context and school list so the coach can produce sharper engineering-focused guidance this month.",
       topActions: [
         "Tell the coach your current SAT / ACT plan or latest official result.",
         "Add 6-10 schools so the coach can separate reach, target, and safer-fit options.",
@@ -127,7 +127,7 @@ export const ADMITGENIE_PERSONAS: AdmitGeniePersona[] = [
       "They need a practical plan that feels legible to both student and parent.",
     ],
     coachingOpening:
-      "I am seeing a motivated first-generation 11th grader with strong momentum, but the process still needs structure around school fit, affordability, and timing.",
+      "I am seeing a motivated first-generation family with strong momentum, but the process still needs structure around school fit, affordability, and timing.",
     guidedInterviewPrompt:
       "Start with what matters most right now: the kind of schools you want, any budget limits, and whether testing is still on your list.",
     weeklyBrief: {
@@ -388,6 +388,7 @@ export function buildPersonaDemoState(slug: string = DEFAULT_PERSONA_SLUG): Demo
         value: persona.schoolListSummary,
         status: persona.schoolListStatus,
       },
+      applicationTiming: starterState.profileFields.applicationTiming,
       currentFocus: {
         label: "Current focus",
         value: persona.currentFocus,

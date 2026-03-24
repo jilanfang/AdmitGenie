@@ -19,6 +19,8 @@ import {
   type DemoState,
   type MaterialDraft,
   type MaterialType,
+  type ProfilePatch,
+  type ProfilePatchStatus,
 } from "@/lib/domain/demo-state";
 import {
   DEFAULT_PERSONA_SLUG,
@@ -32,6 +34,7 @@ import {
 export const DEMO_HOUSEHOLD_ID = "demo-household";
 export const DEMO_STUDENT_PROFILE_ID = "demo-student";
 const DEMO_SOURCE_CHANNEL = "coach_inbox";
+const DEFAULT_WORKSPACE_KEY = "default";
 
 type ConversationRow = typeof conversations.$inferSelect;
 type ConversationInsert = typeof conversations.$inferInsert;
@@ -75,6 +78,8 @@ export type CoachSnapshot = {
   conversation: DemoState["conversation"];
   materials: DemoState["materials"];
   patches: DemoState["patches"];
+  pendingPatch: DemoState["pendingPatch"];
+  materialAnalysis: DemoState["materialAnalysis"];
   weeklyBrief: DemoState["weeklyBrief"];
   profileFields: DemoState["profileFields"];
 };
@@ -96,10 +101,10 @@ export type DemoDeploymentStatus = {
 export type PersistenceAdapter = {
   kind: "memory" | "drizzle";
   canSwitchPersonas: boolean;
-  getCoachSnapshot: () => Promise<CoachSnapshot>;
-  getSelectedPersonaSlug: () => string;
-  switchPersona: (slug: string) => Promise<CoachSnapshot>;
-  submitConversation: (message: string) => Promise<{
+  getCoachSnapshot: (workspace?: string) => Promise<CoachSnapshot>;
+  getSelectedPersonaSlug: (workspace?: string) => string;
+  switchPersona: (slug: string, workspace?: string) => Promise<CoachSnapshot>;
+  submitConversation: (message: string, workspace?: string) => Promise<{
     state: CoachSnapshot;
     reply: {
       goal: string;
@@ -107,9 +112,10 @@ export type PersistenceAdapter = {
       missingProfileFields: Array<keyof DemoState["profileFields"]>;
     };
   }>;
-  submitMaterial: (draft: MaterialDraft) => Promise<{
+  submitMaterial: (draft: MaterialDraft, workspace?: string) => Promise<{
     state: CoachSnapshot;
     latestPatch: DemoState["patches"][number] | null;
+    materialAnalysis: DemoState["materialAnalysis"][number] | null;
     weeklyBrief: DemoState["weeklyBrief"];
   }>;
 };
@@ -139,37 +145,60 @@ export function resetDemoPersistenceForTests() {
 }
 
 function createMemoryPersistenceAdapter(): PersistenceAdapter {
-  let selectedPersonaSlug = DEFAULT_PERSONA_SLUG;
-  let state = buildPersonaDemoState(selectedPersonaSlug);
+  const workspaceStates = new Map<
+    string,
+    { selectedPersonaSlug: string; state: DemoState }
+  >();
+
+  const resolveWorkspaceState = (workspace?: string) => {
+    const key = resolveWorkspaceKey(workspace);
+    const existing = workspaceStates.get(key);
+
+    if (existing) {
+      return existing;
+    }
+
+    const created = {
+      selectedPersonaSlug: DEFAULT_PERSONA_SLUG,
+      state: buildPersonaDemoState(DEFAULT_PERSONA_SLUG),
+    };
+    workspaceStates.set(key, created);
+    return created;
+  };
 
   return {
     kind: "memory",
     canSwitchPersonas: true,
-    async getCoachSnapshot() {
-      return snapshotFromState(state, selectedPersonaSlug);
+    async getCoachSnapshot(workspace) {
+      const current = resolveWorkspaceState(workspace);
+      return snapshotFromState(current.state, current.selectedPersonaSlug);
     },
-    getSelectedPersonaSlug() {
-      return selectedPersonaSlug;
+    getSelectedPersonaSlug(workspace) {
+      return resolveWorkspaceState(workspace).selectedPersonaSlug;
     },
-    async switchPersona(slug) {
-      selectedPersonaSlug = slug;
-      state = buildPersonaDemoState(slug);
-      return snapshotFromState(state, selectedPersonaSlug);
+    async switchPersona(slug, workspace) {
+      const current = resolveWorkspaceState(workspace);
+      current.selectedPersonaSlug = slug;
+      current.state = buildPersonaDemoState(slug);
+      return snapshotFromState(current.state, current.selectedPersonaSlug);
     },
-    async submitConversation(message) {
-      const result = continueDemoConversation({ state, message });
-      state = result.state;
+    async submitConversation(message, workspace) {
+      const current = resolveWorkspaceState(workspace);
+      const result = continueDemoConversation({ state: current.state, message });
+      current.state = result.state;
       return {
-        state: snapshotFromState(result.state, selectedPersonaSlug),
+        state: snapshotFromState(result.state, current.selectedPersonaSlug),
         reply: result.reply,
       };
     },
-    async submitMaterial(draft) {
-      const result = applyDemoMaterial({ state, draft });
-      state = result.state;
+    async submitMaterial(draft, workspace) {
+      const current = resolveWorkspaceState(workspace);
+      const result = applyDemoMaterial({ state: current.state, draft });
+      current.state = result.state;
       return {
-        state: snapshotFromState(result.state, selectedPersonaSlug),
+        state: snapshotFromState(result.state, current.selectedPersonaSlug),
         latestPatch: result.latestPatch,
+        materialAnalysis: result.materialAnalysis,
         weeklyBrief: result.weeklyBrief,
       };
     },
@@ -182,41 +211,54 @@ function createDrizzlePersistenceAdapter(databaseUrl: string): PersistenceAdapte
   return {
     kind: "drizzle",
     canSwitchPersonas: false,
-    async getCoachSnapshot() {
-      await ensureStarterData(db);
-      const rows = await fetchCoreRows(db);
+    async getCoachSnapshot(workspace) {
+      await ensureStarterData(db, workspace);
+      const rows = await fetchCoreRows(db, workspace);
       return hydrateDemoStateFromPersistenceRows(rows);
     },
     getSelectedPersonaSlug() {
       return DEFAULT_PERSONA_SLUG;
     },
-    async switchPersona(slug) {
+    async switchPersona(slug, workspace) {
       if (slug !== DEFAULT_PERSONA_SLUG) {
         throw new Error("Persona switching is only supported in memory demo mode.");
       }
 
-      await ensureStarterData(db);
-      const rows = await fetchCoreRows(db);
+      await ensureStarterData(db, workspace);
+      const rows = await fetchCoreRows(db, workspace);
       return hydrateDemoStateFromPersistenceRows(rows);
     },
-    async submitConversation(message) {
-      await ensureStarterData(db);
+    async submitConversation(message, workspace) {
+      await ensureStarterData(db, workspace);
 
-      const currentRows = await fetchCoreRows(db);
+      const currentRows = await fetchCoreRows(db, workspace);
       const currentSnapshot = hydrateDemoStateFromPersistenceRows(currentRows);
       const currentState = snapshotToDemoState(currentSnapshot);
       const result = continueDemoConversation({ state: currentState, message });
-      const [latestCoachMessage, latestFamilyMessage] = result.state.conversation;
+      const latestFamilyMessage = result.state.conversation.at(-2);
+      const latestCoachMessage = result.state.conversation.at(-1);
 
       if (latestFamilyMessage) {
-        await insertConversation(db, latestFamilyMessage, "clarify_profile", "family");
+        await insertConversation(
+          db,
+          latestFamilyMessage,
+          "clarify_profile",
+          "family",
+          workspace,
+        );
       }
 
       if (latestCoachMessage) {
-        await insertConversation(db, latestCoachMessage, "clarify_profile", "coach");
+        await insertConversation(
+          db,
+          latestCoachMessage,
+          "clarify_profile",
+          "coach",
+          workspace,
+        );
       }
 
-      const persistedRows = await fetchCoreRows(db);
+      const persistedRows = await fetchCoreRows(db, workspace);
       const persistedState = hydrateDemoStateFromPersistenceRows(persistedRows);
 
       return {
@@ -224,45 +266,47 @@ function createDrizzlePersistenceAdapter(databaseUrl: string): PersistenceAdapte
         reply: result.reply,
       };
     },
-    async submitMaterial(draft) {
-      await ensureStarterData(db);
+    async submitMaterial(draft, workspace) {
+      await ensureStarterData(db, workspace);
 
-      const currentRows = await fetchCoreRows(db);
+      const currentRows = await fetchCoreRows(db, workspace);
       const currentSnapshot = hydrateDemoStateFromPersistenceRows(currentRows);
       const currentState = snapshotToDemoState(currentSnapshot);
       const nextResult = applyDemoMaterial({ state: currentState, draft });
-      const latestConversation = nextResult.state.conversation[0];
-      const previousConversation = currentState.conversation[0];
+      const latestConversation = nextResult.state.conversation.at(-1);
+      const previousConversation = currentState.conversation.at(-1);
 
-      const savedMaterial = await insertMaterial(db, draft);
+      const savedMaterial = await insertMaterial(db, draft, workspace);
 
       if (nextResult.latestPatch) {
         await insertPatch(db, {
           materialId: savedMaterial.id,
           patch: nextResult.latestPatch,
           state: nextResult.state,
+          workspace,
         });
       }
 
-      await insertWeeklyBrief(db, nextResult.state.weeklyBrief, "material_update");
+      await insertWeeklyBrief(db, nextResult.state.weeklyBrief, "material_update", workspace);
 
       if (latestConversation && latestConversation !== previousConversation) {
-        await insertConversation(db, latestConversation, "confirm_patch");
+        await insertConversation(db, latestConversation, "confirm_patch", "coach", workspace);
       }
 
-      const persistedRows = await fetchCoreRows(db);
+      const persistedRows = await fetchCoreRows(db, workspace);
       const persistedState = hydrateDemoStateFromPersistenceRows(persistedRows);
 
       return {
         state: persistedState,
         latestPatch: persistedState.patches[0] ?? null,
+        materialAnalysis: persistedState.materialAnalysis[0] ?? null,
         weeklyBrief: persistedState.weeklyBrief,
       };
     },
   };
 }
 
-export function buildDrizzleSeedPayload(): {
+export function buildDrizzleSeedPayload(workspace?: string): {
   household: HouseholdInsert;
   studentProfile: StudentProfileInsert;
   conversations: ConversationInsert[];
@@ -271,11 +315,12 @@ export function buildDrizzleSeedPayload(): {
   const defaultPersona = getDefaultPersona();
   const starterState = buildPersonaDemoState();
   const starterAt = new Date("2026-03-22T14:00:00.000Z");
+  const ids = buildWorkspaceEntityIds(workspace);
 
   return {
     household: {
-      id: DEMO_HOUSEHOLD_ID,
-      primaryStudentId: DEMO_STUDENT_PROFILE_ID,
+      id: ids.householdId,
+      primaryStudentId: ids.studentProfileId,
       primaryGuardianEmail: "demo-family@admitgenie.local",
       timezone: defaultPersona.household.timezone,
       goalsSummary: defaultPersona.household.goalsSummary,
@@ -283,8 +328,8 @@ export function buildDrizzleSeedPayload(): {
       updatedAt: starterAt,
     },
     studentProfile: {
-      id: DEMO_STUDENT_PROFILE_ID,
-      householdId: DEMO_HOUSEHOLD_ID,
+      id: ids.studentProfileId,
+      householdId: ids.householdId,
       firstName: defaultPersona.studentProfile.firstName,
       gradeLevel: defaultPersona.studentProfile.gradeLevel,
       graduationYear: defaultPersona.studentProfile.graduationYear,
@@ -296,15 +341,15 @@ export function buildDrizzleSeedPayload(): {
       updatedAt: starterAt,
     },
     conversations: starterState.conversation.map((content, index) => ({
-      householdId: DEMO_HOUSEHOLD_ID,
-      studentProfileId: DEMO_STUDENT_PROFILE_ID,
+      householdId: ids.householdId,
+      studentProfileId: ids.studentProfileId,
       role: "coach",
       content,
       conversationGoal: index === 0 ? "collect_context" : "clarify_profile",
       createdAt: new Date(starterAt.getTime() - index * 60_000),
     })),
     weeklyBrief: {
-      studentProfileId: DEMO_STUDENT_PROFILE_ID,
+      studentProfileId: ids.studentProfileId,
       weekStartDate: "2026-03-16",
       whatChanged: starterState.weeklyBrief.whatChanged,
       whatMatters: starterState.weeklyBrief.whatMatters,
@@ -317,13 +362,13 @@ export function buildDrizzleSeedPayload(): {
   };
 }
 
-export async function getDemoStateResponseFromPersistence() {
+export async function getDemoStateResponseFromPersistence(workspace?: string) {
   const adapter = getSharedDemoPersistenceAdapter();
 
   return {
-    state: await adapter.getCoachSnapshot(),
+    state: await adapter.getCoachSnapshot(workspace),
     capabilities: getDemoCapabilities(),
-    demoPersona: getDemoPersonaConfig(adapter),
+    demoPersona: getDemoPersonaConfig(adapter, adapter.getSelectedPersonaSlug(workspace)),
     deployment: getDemoDeploymentStatus(adapter),
   };
 }
@@ -345,7 +390,7 @@ export function getDemoDeploymentStatus(
   };
 }
 
-export async function switchDemoPersonaFromPersistence(slug: string) {
+export async function switchDemoPersonaFromPersistence(slug: string, workspace?: string) {
   if (!isPersonaSlug(slug)) {
     throw new Error("Invalid persona slug.");
   }
@@ -353,7 +398,7 @@ export async function switchDemoPersonaFromPersistence(slug: string) {
   const adapter = getSharedDemoPersistenceAdapter();
 
   return {
-    state: await adapter.switchPersona(slug),
+    state: await adapter.switchPersona(slug, workspace),
     demoPersona: getDemoPersonaConfig(adapter, slug),
   };
 }
@@ -369,13 +414,22 @@ export function hydrateDemoStateFromPersistenceRows(
   const latestTestingStatus = findLatestTestingStatus(sortedPatches);
   const latestBrief = sortedBriefs[0];
   const entitySummary = resolveEntitySummary(rows);
+  const hydratedPatches: ProfilePatch[] =
+    sortedPatches.length > 0
+      ? sortedPatches.map((item) => ({
+          id: item.id,
+          summary: item.patchSummary,
+          impact: item.impactSummary,
+          status: toProfilePatchStatus(item.status),
+        }))
+      : starterState.patches;
 
   return {
     household: entitySummary.household,
     studentProfile: entitySummary.studentProfile,
     conversation:
       sortedConversations.length > 0
-        ? sortedConversations.map((item) => item.content)
+        ? sortedConversations.map((item) => item.content).reverse()
         : starterState.conversation,
     materials:
       sortedMaterials.length > 0
@@ -387,15 +441,27 @@ export function hydrateDemoStateFromPersistenceRows(
             submittedAt: item.submittedAt.toISOString(),
           }))
         : starterState.materials,
-    patches:
+    patches: hydratedPatches,
+    pendingPatch:
+      hydratedPatches.find(
+        (patch) => patch.status === "needs_confirmation" || patch.status === "conflict",
+      ) ?? starterState.pendingPatch,
+    materialAnalysis:
       sortedPatches.length > 0
         ? sortedPatches.map((item) => ({
-            id: item.id,
-            summary: item.patchSummary,
-            impact: item.impactSummary,
-            status: "applied",
+            id: `analysis-${item.id}`,
+            materialType: inferMaterialTypeFromPatch(item),
+            patchStatus:
+              item.status === "applied" ||
+              item.status === "needs_confirmation" ||
+              item.status === "conflict"
+                ? item.status
+                : "applied",
+            extractedFacts: inferExtractedFactsFromPatch(item),
+            affectedFields: inferAffectedFieldsFromPatch(item),
+            profileImpact: item.impactSummary,
           }))
-        : starterState.patches,
+        : starterState.materialAnalysis,
     profileFields: {
       ...starterState.profileFields,
       testingStatus: latestTestingStatus
@@ -426,25 +492,33 @@ export function hydrateDemoStateFromPersistenceRows(
   };
 }
 
-async function ensureStarterData(db: AdmitGenieDatabase): Promise<void> {
+async function ensureStarterData(
+  db: AdmitGenieDatabase,
+  workspace?: string,
+): Promise<void> {
+  const ids = buildWorkspaceEntityIds(workspace);
   const [existingHousehold] = await db
     .select({ id: households.id })
     .from(households)
+    .where(eq(households.id, ids.householdId))
     .limit(1);
   const [existingStudentProfile] = await db
     .select({ id: studentProfiles.id })
     .from(studentProfiles)
+    .where(eq(studentProfiles.id, ids.studentProfileId))
     .limit(1);
   const [existingConversation] = await db
     .select({ id: conversations.id })
     .from(conversations)
+    .where(eq(conversations.householdId, ids.householdId))
     .limit(1);
   const [existingBrief] = await db
     .select({ id: weeklyBriefs.id })
     .from(weeklyBriefs)
+    .where(eq(weeklyBriefs.studentProfileId, ids.studentProfileId))
     .limit(1);
 
-  const seed = buildDrizzleSeedPayload();
+  const seed = buildDrizzleSeedPayload(workspace);
 
   if (!existingHousehold) {
     await db.insert(households).values(seed.household);
@@ -463,15 +537,43 @@ async function ensureStarterData(db: AdmitGenieDatabase): Promise<void> {
   }
 }
 
-async function fetchCoreRows(db: AdmitGenieDatabase): Promise<PersistedCoreRows> {
+async function fetchCoreRows(
+  db: AdmitGenieDatabase,
+  workspace?: string,
+): Promise<PersistedCoreRows> {
+  const ids = buildWorkspaceEntityIds(workspace);
   const [householdRows, studentProfileRows, conversationRows, materialRows, patchRows, briefRows] =
     await Promise.all([
-      db.select().from(households).orderBy(desc(households.updatedAt)),
-      db.select().from(studentProfiles).orderBy(desc(studentProfiles.updatedAt)),
-    db.select().from(conversations).orderBy(desc(conversations.createdAt)),
-    db.select().from(materialItems).orderBy(desc(materialItems.submittedAt)),
-    db.select().from(profilePatches).orderBy(desc(profilePatches.createdAt)),
-    db.select().from(weeklyBriefs).orderBy(desc(weeklyBriefs.createdAt)),
+      db
+        .select()
+        .from(households)
+        .where(eq(households.id, ids.householdId))
+        .orderBy(desc(households.updatedAt)),
+      db
+        .select()
+        .from(studentProfiles)
+        .where(eq(studentProfiles.id, ids.studentProfileId))
+        .orderBy(desc(studentProfiles.updatedAt)),
+      db
+        .select()
+        .from(conversations)
+        .where(eq(conversations.householdId, ids.householdId))
+        .orderBy(desc(conversations.createdAt)),
+      db
+        .select()
+        .from(materialItems)
+        .where(eq(materialItems.householdId, ids.householdId))
+        .orderBy(desc(materialItems.submittedAt)),
+      db
+        .select()
+        .from(profilePatches)
+        .where(eq(profilePatches.studentProfileId, ids.studentProfileId))
+        .orderBy(desc(profilePatches.createdAt)),
+      db
+        .select()
+        .from(weeklyBriefs)
+        .where(eq(weeklyBriefs.studentProfileId, ids.studentProfileId))
+        .orderBy(desc(weeklyBriefs.createdAt)),
     ]);
 
   return {
@@ -487,8 +589,9 @@ async function fetchCoreRows(db: AdmitGenieDatabase): Promise<PersistedCoreRows>
 async function insertMaterial(
   db: AdmitGenieDatabase,
   draft: MaterialDraft,
+  workspace?: string,
 ): Promise<MaterialRow> {
-  const entities = await resolveDemoEntities(db);
+  const entities = await resolveDemoEntities(db, workspace);
   const [inserted] = await db
     .insert(materialItems)
     .values({
@@ -511,9 +614,10 @@ async function insertPatch(
     materialId: string;
     patch: DemoState["patches"][number];
     state: DemoState;
+    workspace?: string;
   },
 ): Promise<ProfilePatchRow> {
-  const entities = await resolveDemoEntities(db);
+  const entities = await resolveDemoEntities(db, input.workspace);
   const [inserted] = await db
     .insert(profilePatches)
     .values({
@@ -536,8 +640,9 @@ async function insertWeeklyBrief(
   db: AdmitGenieDatabase,
   brief: DemoState["weeklyBrief"],
   generationReason: string,
+  workspace?: string,
 ): Promise<WeeklyBriefRow> {
-  const entities = await resolveDemoEntities(db);
+  const entities = await resolveDemoEntities(db, workspace);
   const [inserted] = await db
     .insert(weeklyBriefs)
     .values({
@@ -560,8 +665,9 @@ async function insertConversation(
   content: string,
   goal: string,
   role: string = "coach",
+  workspace?: string,
 ): Promise<ConversationRow> {
-  const entities = await resolveDemoEntities(db);
+  const entities = await resolveDemoEntities(db, workspace);
   const [inserted] = await db
     .insert(conversations)
     .values({
@@ -576,20 +682,24 @@ async function insertConversation(
   return inserted;
 }
 
-async function resolveDemoEntities(db: AdmitGenieDatabase): Promise<{
+async function resolveDemoEntities(
+  db: AdmitGenieDatabase,
+  workspace?: string,
+): Promise<{
   household: HouseholdRow;
   studentProfile: StudentProfileRow;
 }> {
+  const ids = buildWorkspaceEntityIds(workspace);
   const [household, studentProfile] = await Promise.all([
     db
       .select()
       .from(households)
-      .where(eq(households.id, DEMO_HOUSEHOLD_ID))
+      .where(eq(households.id, ids.householdId))
       .limit(1),
     db
       .select()
       .from(studentProfiles)
-      .where(eq(studentProfiles.id, DEMO_STUDENT_PROFILE_ID))
+      .where(eq(studentProfiles.id, ids.studentProfileId))
       .limit(1),
   ]);
 
@@ -628,6 +738,8 @@ function snapshotFromState(
     conversation: state.conversation,
     materials: state.materials,
     patches: state.patches,
+    pendingPatch: state.pendingPatch,
+    materialAnalysis: state.materialAnalysis,
     weeklyBrief: state.weeklyBrief,
     profileFields: state.profileFields,
   };
@@ -638,6 +750,8 @@ function snapshotToDemoState(snapshot: CoachSnapshot): DemoState {
     conversation: snapshot.conversation,
     materials: snapshot.materials,
     patches: snapshot.patches,
+    pendingPatch: snapshot.pendingPatch,
+    materialAnalysis: snapshot.materialAnalysis,
     profileFields: snapshot.profileFields,
     weeklyBrief: snapshot.weeklyBrief,
   };
@@ -711,6 +825,69 @@ function toStringArray(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === "string");
 }
 
+function inferMaterialTypeFromPatch(patch: ProfilePatchRow): MaterialType {
+  const summary = patch.patchSummary.toLowerCase();
+
+  if (summary.includes("sat") || summary.includes("score")) {
+    return "test_score";
+  }
+
+  if (summary.includes("school list")) {
+    return "school_list";
+  }
+
+  if (summary.includes("activity")) {
+    return "activity_update";
+  }
+
+  return "freeform_note";
+}
+
+function inferExtractedFactsFromPatch(patch: ProfilePatchRow): string[] {
+  const summary = patch.patchSummary;
+  const facts: string[] = [];
+  const mathMatch = summary.match(/SAT Math (\d{3})/i);
+  const rwMatch = summary.match(/(?:Reading and Writing (\d{3})|RW (\d{3}))/i);
+
+  if (mathMatch?.[1]) {
+    facts.push(`SAT Math ${mathMatch[1]}`);
+  }
+
+  if (rwMatch?.[1] || rwMatch?.[2]) {
+    facts.push(`RW ${rwMatch[1] ?? rwMatch[2]}`);
+  }
+
+  return facts;
+}
+
+function inferAffectedFieldsFromPatch(
+  patch: ProfilePatchRow,
+): Array<keyof DemoState["profileFields"]> {
+  const payload = patch.patchPayloadJson;
+
+  if (payload && typeof payload === "object" && "testingStatus" in payload) {
+    return ["testingStatus"];
+  }
+
+  if (patch.patchSummary.toLowerCase().includes("school list")) {
+    return ["schoolList"];
+  }
+
+  if (patch.patchSummary.toLowerCase().includes("activity")) {
+    return ["currentFocus"];
+  }
+
+  return ["currentFocus"];
+}
+
+function toProfilePatchStatus(value: string): ProfilePatchStatus {
+  if (value === "needs_confirmation" || value === "conflict" || value === "applied") {
+    return value;
+  }
+
+  return "applied";
+}
+
 function resolveEntitySummary(rows: PersistedCoreRows): {
   household: CoachHousehold;
   studentProfile: CoachStudentProfile;
@@ -768,5 +945,35 @@ function getDemoPersonaConfig(
     canSwitch: adapter.canSwitchPersonas,
     selectedSlug,
     options: listPersonaOptions(),
+  };
+}
+
+function resolveWorkspaceKey(workspace?: string): string {
+  return workspace && workspace.trim().length > 0 ? workspace.trim() : DEFAULT_WORKSPACE_KEY;
+}
+
+function buildWorkspaceEntityIds(workspace?: string): {
+  householdId: string;
+  studentProfileId: string;
+} {
+  const key = resolveWorkspaceKey(workspace);
+
+  if (key === DEFAULT_WORKSPACE_KEY) {
+    return {
+      householdId: DEMO_HOUSEHOLD_ID,
+      studentProfileId: DEMO_STUDENT_PROFILE_ID,
+    };
+  }
+
+  const slug = key
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 34);
+  const safeSlug = slug.length > 0 ? slug : "workspace";
+
+  return {
+    householdId: `workspace-${safeSlug}-household`,
+    studentProfileId: `workspace-${safeSlug}-student`,
   };
 }

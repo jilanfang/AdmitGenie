@@ -115,7 +115,7 @@ describe("memory persistence adapter", () => {
 });
 
 describe("drizzle persistence helpers", () => {
-  it("builds starter seed rows for conversation and the first weekly brief", () => {
+  it("builds starter seed rows for conversation and the first brief", () => {
     const seed = buildDrizzleSeedPayload();
 
     expect(seed.household.id).toBe(DEMO_HOUSEHOLD_ID);
@@ -125,6 +125,30 @@ describe("drizzle persistence helpers", () => {
     expect(seed.conversations[0]?.householdId).toBe(DEMO_HOUSEHOLD_ID);
     expect(seed.conversations[0]?.studentProfileId).toBe(DEMO_STUDENT_PROFILE_ID);
     expect(seed.weeklyBrief.generationReason).toBe("starter_profile");
+  });
+
+  it("derives isolated durable ids for different workspaces", () => {
+    const alpha = buildDrizzleSeedPayload("alpha");
+    const beta = buildDrizzleSeedPayload("beta");
+
+    expect(alpha.household.id).not.toBe(beta.household.id);
+    expect(alpha.studentProfile.id).not.toBe(beta.studentProfile.id);
+    expect(alpha.household.id).toContain("alpha");
+    expect(beta.household.id).toContain("beta");
+  });
+
+  it("keeps all seeded relationships aligned to the requested workspace", () => {
+    const seed = buildDrizzleSeedPayload("demo-room");
+
+    expect(seed.studentProfile.householdId).toBe(seed.household.id);
+    expect(seed.household.primaryStudentId).toBe(seed.studentProfile.id);
+    expect(seed.conversations.every((item) => item.householdId === seed.household.id)).toBe(
+      true,
+    );
+    expect(
+      seed.conversations.every((item) => item.studentProfileId === seed.studentProfile.id),
+    ).toBe(true);
+    expect(seed.weeklyBrief.studentProfileId).toBe(seed.studentProfile.id);
   });
 
   it("hydrates demo state from persisted core rows", () => {
@@ -202,4 +226,5 @@ describe("drizzle persistence helpers", () => {
     expect(hydrated.studentProfile.id).toBe(DEMO_STUDENT_PROFILE_ID);
     expect(hydrated.conversation[0]).toContain("SAT update");
   });
+
 });

@@ -97,7 +97,7 @@ Rule:
 
 Purpose:
 
-- send weekly brief emails or notifications
+- send monthly brief emails or notifications
 
 MVP candidate:
 
@@ -105,7 +105,7 @@ MVP candidate:
 
 Interface shape:
 
-- `sendWeeklyBrief`
+- `sendMonthlyBrief`
 - `sendAlert`
 
 ## 6. Search / Research Adapter

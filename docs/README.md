@@ -5,9 +5,9 @@ This repository currently holds the product and technical documentation scaffold
 AdmitGenie is defined in this first phase as:
 
 - an AI-native admissions coach for North America
-- focused on 11th-grade families
+- focused on 9th-11th grade families
 - centered on a `Coach Inbox` experience
-- driven by `guided interview + material inbox + weekly brief`
+- driven by `guided interview + material inbox + monthly brief`
 - built as a `Vercel-first MVP`
 
 ## Reading Order

@@ -9,9 +9,9 @@ This repository contains the first working scaffold for the AdmitGenie AI-native
 - `app/`
   A minimal Next.js App Router experience for the `Coach Inbox`.
 - `components/coach-shell.tsx`
-  Demo UI showing guided interview, hidden profile state, material inbox, and weekly brief.
+  Demo UI showing guided interview, hidden profile state, material inbox, and monthly brief framing.
 - `lib/domain/demo-state.ts`
-  Mock domain logic for profile patches and weekly brief regeneration after new material arrives.
+  Mock domain logic for profile patches and brief regeneration after new material arrives.
 - `tests/`
   Basic domain, UI, and build-script regression coverage.
 

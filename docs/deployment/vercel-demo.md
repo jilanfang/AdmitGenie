@@ -11,6 +11,7 @@ Stable shared demo deployment requires:
 - Vercel project
 - Neon Postgres database
 - `DATABASE_URL` configured in Vercel
+- `DEMO_ACCESS_CODE` configured in Vercel
 
 Without `DATABASE_URL`, the app runs in memory mode and state is not durable across instances or restarts.
 
@@ -28,6 +29,7 @@ Set in Vercel:
 
 ```bash
 DATABASE_URL=postgresql://username:password@hostname:5432/admitgenie
+DEMO_ACCESS_CODE=your-shared-demo-code
 ```
 
 ## Deploy Steps
@@ -57,11 +59,15 @@ After deploy, verify these routes:
   - should return `readyForSharedDemo: true`
 - `/api/demo/materials`
   - should accept a valid draft payload and return updated state
+- `/api/demo/access`
+  - should accept the configured demo access code and set the access cookie
 
 ## Current Expected UI Behavior
 
+- The home page requires the shared demo access code before rendering the coach shell.
 - If deployment is still in memory mode, the page shows an `Ephemeral demo mode` warning.
 - If `DATABASE_URL` is configured correctly, that warning should disappear.
+- Each browser session keeps a workspace code in local storage so demo state stays isolated by workspace.
 - Persona switching is available in memory demo mode only.
 - Stable shared demo mode is focused on persistent state, not persona switching.
 

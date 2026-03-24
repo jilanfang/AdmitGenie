@@ -4,7 +4,9 @@ import {
 import { getSharedDemoPersistenceAdapter } from "@/lib/server/persistence";
 
 export async function POST(request: Request) {
-  const payload = (await readJson(request)) as DemoConversationSubmission | null;
+  const payload = (await readJson(request)) as (DemoConversationSubmission & {
+    workspace?: string;
+  }) | null;
 
   if (!payload || typeof payload.message !== "string" || payload.message.trim().length === 0) {
     return Response.json(
@@ -18,7 +20,10 @@ export async function POST(request: Request) {
 
   return Response.json({
     ok: true,
-    data: await getSharedDemoPersistenceAdapter().submitConversation(payload.message),
+    data: await getSharedDemoPersistenceAdapter().submitConversation(
+      payload.message,
+      payload.workspace ?? new URL(request.url).searchParams.get("workspace") ?? undefined,
+    ),
   });
 }
 

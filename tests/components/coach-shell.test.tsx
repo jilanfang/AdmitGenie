@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event";
 
 import { CoachShell } from "@/components/coach-shell";
 import { continueDemoConversation } from "@/lib/domain/demo-contracts";
-import { createInitialDemoState, submitMaterialDraft } from "@/lib/domain/demo-state";
+import {
+  createInitialDemoState,
+  deriveDecisionCard,
+  deriveSuggestedReplies,
+  submitMaterialDraft,
+} from "@/lib/domain/demo-state";
 import {
   DEMO_HOUSEHOLD_ID,
   DEMO_STUDENT_PROFILE_ID,
@@ -22,8 +27,16 @@ function snapshotToState(snapshot: CoachSnapshot) {
   };
 }
 
-function createStarterSnapshot(): CoachSnapshot {
+function withDecisionCard(snapshot: CoachSnapshot): CoachSnapshot {
   return {
+    ...snapshot,
+    decisionCard: deriveDecisionCard(snapshotToState(snapshot)),
+    suggestedReplies: deriveSuggestedReplies(snapshotToState(snapshot)),
+  };
+}
+
+function createStarterSnapshot(): CoachSnapshot {
+  return withDecisionCard({
     household: {
       id: DEMO_HOUSEHOLD_ID,
       timezone: "America/Los_Angeles",
@@ -37,7 +50,7 @@ function createStarterSnapshot(): CoachSnapshot {
       majorDirection: "Selective engineering programs",
     },
     ...createInitialDemoState(),
-  };
+  });
 }
 
 function advanceSnapshot(
@@ -114,7 +127,7 @@ describe("CoachShell", () => {
           "This family needs the coach to reduce process ambiguity and turn ambition into a realistic admissions plan.",
       },
     };
-    const starterSnapshot = {
+    const starterSnapshot = withDecisionCard({
       household: {
         id: DEMO_HOUSEHOLD_ID,
         timezone: "America/Los_Angeles",
@@ -128,8 +141,8 @@ describe("CoachShell", () => {
         majorDirection: "Selective engineering programs",
       },
       ...starterState,
-    };
-    const firstGenSnapshot = {
+    });
+    const firstGenSnapshot = withDecisionCard({
       household: {
         id: DEMO_HOUSEHOLD_ID,
         timezone: "America/Chicago",
@@ -144,16 +157,16 @@ describe("CoachShell", () => {
         majorDirection: "Business, economics, or public policy",
       },
       ...firstGenState,
-    };
+    });
     const satState = submitMaterialDraft(starterState, {
       type: "test_score",
       title: "March SAT",
       content: "New SAT update: Math 760, Reading and Writing 730.",
     });
-    const satSnapshot = {
+    const satSnapshot = withDecisionCard({
       ...starterSnapshot,
       ...satState,
-    };
+    });
     let currentSnapshot: CoachSnapshot = starterSnapshot;
     let selectedPersonaSlug = "strategic-stem-striver";
     const personaOptions = [
@@ -222,10 +235,10 @@ describe("CoachShell", () => {
           title: draft.title,
           content: draft.content,
         });
-        currentSnapshot = {
+        currentSnapshot = withDecisionCard({
           ...currentSnapshot,
           ...nextState,
-        };
+        });
 
         return new Response(
           JSON.stringify({
@@ -255,10 +268,10 @@ describe("CoachShell", () => {
           state: snapshotToState(currentSnapshot),
           message,
         });
-        currentSnapshot = {
+        currentSnapshot = withDecisionCard({
           ...currentSnapshot,
           ...result.state,
-        };
+        });
 
         return new Response(
           JSON.stringify({
@@ -273,7 +286,7 @@ describe("CoachShell", () => {
 
       if (url.endsWith("/api/demo/persona")) {
         selectedPersonaSlug = "first-gen-ambition-builder";
-        currentSnapshot = firstGenSnapshot;
+        currentSnapshot = withDecisionCard(firstGenSnapshot);
 
         return new Response(
           JSON.stringify({
@@ -294,7 +307,7 @@ describe("CoachShell", () => {
     }) as typeof fetch;
 
     vi.stubGlobal("__setCoachSnapshot", (snapshot: CoachSnapshot) => {
-      currentSnapshot = snapshot;
+      currentSnapshot = withDecisionCard(snapshot);
     });
   });
 
@@ -309,20 +322,25 @@ describe("CoachShell", () => {
     render(<CoachShell />);
 
     expect(
-      await screen.findByRole("heading", { name: /build your first admissions plan/i }),
+      await screen.findByText(/I already have a light starting point for your family/i),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText(/I can help you build your first admissions plan through conversation/i),
+      await screen.findByText(/Let's make this simple/i),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /send message/i })).toBeInTheDocument();
-    expect(screen.getByText(/What I know/i)).toBeInTheDocument();
-    expect(screen.getByText(/What’s missing/i)).toBeInTheDocument();
-    expect(screen.getByText(/Add material/i)).toBeInTheDocument();
-    expect(screen.getByText(/ephemeral demo mode/i)).toBeInTheDocument();
-    expect(screen.getByText(/Demo status/i)).toBeInTheDocument();
-    expect(screen.getByText(/Ephemeral local demo/i)).toBeInTheDocument();
-    expect(screen.getByText(/Scenario/i)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /weekly brief/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^send$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open attachment options/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open workspace panel/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /i'm in 11th grade/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /we don't have a school list yet/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /we have a new test score/i })).toBeInTheDocument();
+    expect(screen.queryByText(/Demo status/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ephemeral demo mode/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /view current brief/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^new chat$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /show demo controls/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add file/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /paste note/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Monthly brief$/i)).not.toBeInTheDocument();
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringMatching(/^\/api\/demo\/state\?workspace=/),
@@ -330,31 +348,44 @@ describe("CoachShell", () => {
     });
   });
 
-  it("lets a user open the current brief without requiring a material update", async () => {
+  it("lets a user start from a suggested reply card without typing the first message", async () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
-    await user.click(screen.getByRole("button", { name: /view current brief/i }));
+    await user.click(screen.getByRole("button", { name: /we don't have a school list yet/i }));
 
-    expect(await screen.findByText(/^Monthly brief$/i)).toBeInTheDocument();
-    expect(screen.getByText(/What changed/i)).toBeInTheDocument();
-    expect(screen.getByText(/starter profile/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/^We do not have a school list yet and need help building one\.$/i),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/demo/conversation",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining(
+            "\"message\":\"We do not have a school list yet and need help building one.\"",
+          ),
+        }),
+      );
+    });
   });
 
   it("persists a workspace code in local storage and reuses it for demo requests", async () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
     const storedWorkspace = window.localStorage.getItem("admitgenie-workspace");
 
     expect(storedWorkspace).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: /open workspace panel/i }));
     expect(screen.getByText(new RegExp(storedWorkspace ?? ""))).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /try a sat update/i }));
+    await user.click(screen.getByRole("button", { name: /try sat sample/i }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -372,6 +403,25 @@ describe("CoachShell", () => {
     });
   });
 
+  it("keeps low-frequency controls hidden until the workspace panel is opened", async () => {
+    const user = userEvent.setup();
+
+    render(<CoachShell />);
+    await screen.findByText(/I already have a light starting point for your family/i);
+
+    expect(screen.queryByText(/Demo status/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Demo persona/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^new chat$/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /open workspace panel/i }));
+
+    expect(await screen.findByText(/Behind the scenes/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Demo persona/i)).toBeInTheDocument();
+    expect(screen.getByText(/local memory mode/i)).toBeInTheDocument();
+    expect(screen.getByText(/High-performing 11th-grade family aiming for selective engineering programs/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^new chat$/i })).toBeInTheDocument();
+  });
+
   it("starts a fresh workspace when the user clicks new chat", async () => {
     const user = userEvent.setup();
     const randomSpy = vi
@@ -380,16 +430,19 @@ describe("CoachShell", () => {
       .mockReturnValueOnce(0.975318642);
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
     const originalWorkspace = window.localStorage.getItem("admitgenie-workspace");
 
+    await user.click(screen.getByRole("button", { name: /open workspace panel/i }));
     await user.click(screen.getByRole("button", { name: /^new chat$/i }));
 
     const nextWorkspace = window.localStorage.getItem("admitgenie-workspace");
 
     expect(nextWorkspace).toBeTruthy();
     expect(nextWorkspace).not.toBe(originalWorkspace);
+
+    await user.click(screen.getByRole("button", { name: /open workspace panel/i }));
     expect(screen.getByText(new RegExp(nextWorkspace ?? ""))).toBeInTheDocument();
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -404,17 +457,17 @@ describe("CoachShell", () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
-    await user.click(screen.getByRole("button", { name: /try a sat update/i }));
+    await user.click(screen.getByRole("button", { name: /open workspace panel/i }));
+    await user.click(screen.getByRole("button", { name: /try sat sample/i }));
 
     expect(
       await screen.findByText(/Parsed SAT Math 760 and Reading and Writing 730/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Patch status: applied/i)).toBeInTheDocument();
-    expect(screen.getByText(/Affected fields: testingStatus/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /view latest brief/i })).toBeInTheDocument();
-    expect(screen.getAllByText(/SAT Math 760 \/ RW 730/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Patch status:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Affected fields:/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /see why i'm saying that/i })).toBeInTheDocument();
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/demo/materials",
@@ -429,39 +482,39 @@ describe("CoachShell", () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
-    await user.click(screen.getByRole("button", { name: /try a sat update/i }));
-    await screen.findByRole("button", { name: /view latest brief/i });
+    await user.click(screen.getByRole("button", { name: /open workspace panel/i }));
+    await user.click(screen.getByRole("button", { name: /try sat sample/i }));
+    await screen.findByRole("button", { name: /see why i'm saying that/i });
 
-    await user.click(screen.getByRole("button", { name: /view latest brief/i }));
+    await user.click(screen.getByRole("button", { name: /see why i'm saying that/i }));
 
-    expect(await screen.findByText(/^Monthly brief$/i)).toBeInTheDocument();
-    expect(await screen.findByText(/What changed/i)).toBeInTheDocument();
-    expect(screen.getByText(/SAT results were added/i)).toBeInTheDocument();
-    expect(screen.getByText(/What matters now/i)).toBeInTheDocument();
-    expect(screen.getByText(/Top actions/i)).toBeInTheDocument();
-    expect(screen.getByText(/Why this advice/i)).toBeInTheDocument();
+    expect(await screen.findByText(/What changed:/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/SAT results were added/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/What matters most right now:/i)).toBeInTheDocument();
+    expect(screen.getByText(/What I'd do next:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Why I'm taking this angle:/i)).toBeInTheDocument();
   });
 
   it("lets a user turn a first-run message into onboarding guidance through the conversation api", async () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
     await user.type(
       screen.getByLabelText(/message coach/i),
       "We want selective engineering programs but do not have a school list yet.",
     );
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /^send$/i }));
 
     expect(
-      await screen.findByText(/Current understanding:/i),
+      await screen.findByText(/Here's where I think things stand:/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Top priority this month:/i)).toBeInTheDocument();
-    expect(screen.getByText(/What would sharpen the advice next:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Family: We want selective engineering programs/i)).toBeInTheDocument();
+    expect(screen.getByText(/What I'd focus on this month:/i)).toBeInTheDocument();
+    expect(screen.getByText(/What would help me guide you better next:/i)).toBeInTheDocument();
+    expect(screen.getByText(/We want selective engineering programs but do not have a school list yet\./i)).toBeInTheDocument();
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/demo/conversation",
@@ -485,26 +538,21 @@ describe("CoachShell", () => {
     );
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
     await screen.findByText(/bucketed school-list strategy with reach and target groups/i);
 
     await user.type(
       screen.getByLabelText(/message coach/i),
       "Purdue and Georgia Tech are early action for us. UT Austin is regular decision, and we do not want binding early decision.",
     );
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /^send$/i }));
 
-    expect(await screen.findByText(/Application timing/i)).toBeInTheDocument();
-    expect(screen.getByText(/Early:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Regular:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Constraint: no binding early decision/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/tightened the plan around early versus regular application pacing/i),
+      await screen.findByText(/tightened the plan around early versus regular application pacing/i),
     ).toBeInTheDocument();
   });
 
   it("prioritizes confirmation language in chat after a pending school-list patch exists", async () => {
-    const user = userEvent.setup();
     const setCoachSnapshot = (globalThis as typeof globalThis & {
       __setCoachSnapshot?: (snapshot: CoachSnapshot) => void;
     }).__setCoachSnapshot;
@@ -519,30 +567,31 @@ describe("CoachShell", () => {
     });
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
-    await screen.findByText(/Patch status: needs_confirmation/i);
-
-    await user.type(screen.getByLabelText(/message coach/i), "What should I do next?");
-    await user.click(screen.getByRole("button", { name: /send message/i }));
-
-    expect(
-      await screen.findByText(/need to confirm the school list signal/i),
-    ).toBeInTheDocument();
+    await screen.findByText(/I already have a light starting point for your family/i);
+    await screen.findByText(/I found possible school names in your latest material\./i);
+    expect(await screen.findByText(/Pick the schools that belong in your current shortlist/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /confirm shortlist/i })).toBeInTheDocument();
   });
 
   it("lets a demo operator switch to another persona scenario", async () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
+    await user.click(screen.getByRole("button", { name: /open workspace panel/i }));
     await user.selectOptions(screen.getByLabelText(/demo persona/i), "first-gen-ambition-builder");
+    await user.click(screen.getByRole("button", { name: /open workspace panel/i }));
 
-    expect(await screen.findByText(/Maya/i)).toBeInTheDocument();
-    expect(screen.getByText(/Business, economics, or public policy/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/first affordable school list and timeline/i).length).toBeGreaterThan(
-      0,
-    );
+    expect(
+      await screen.findByDisplayValue("First-Gen Ambition Builder"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/strong grades and limited admissions context/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/first-generation 11th grader with strong momentum/i),
+    ).toBeInTheDocument();
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/demo/persona",
@@ -557,9 +606,10 @@ describe("CoachShell", () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
-    await user.click(screen.getAllByRole("button", { name: /paste update/i })[0]!);
+    await user.click(screen.getByRole("button", { name: /open attachment options/i }));
+    await user.click(screen.getByRole("button", { name: /paste something/i }));
     await user.selectOptions(screen.getByLabelText(/material type/i), "freeform_note");
     await user.clear(screen.getByLabelText(/title/i));
     await user.type(screen.getByLabelText(/title/i), "Parent timeline concern");
@@ -567,7 +617,7 @@ describe("CoachShell", () => {
       screen.getByLabelText(/material content/i),
       "We are worried about balancing SAT prep with AP exams this spring.",
     );
-    await user.click(screen.getByRole("button", { name: /add material/i }));
+    await user.click(screen.getByRole("button", { name: /share with coach/i }));
 
     expect(
       (
@@ -576,7 +626,7 @@ describe("CoachShell", () => {
         )
       ).length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText(/Patch status: applied/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Patch status:/i)).not.toBeInTheDocument();
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/demo/materials",
@@ -592,9 +642,10 @@ describe("CoachShell", () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
-    await user.click(screen.getAllByRole("button", { name: /upload file/i })[0]!);
+    await user.click(screen.getByRole("button", { name: /open attachment options/i }));
+    await user.click(screen.getByRole("button", { name: /upload something/i }));
     await user.selectOptions(screen.getByLabelText(/material type/i), "activity_update");
 
     const fileInput = screen.getByLabelText(/file upload/i);
@@ -605,12 +656,12 @@ describe("CoachShell", () => {
     );
 
     await user.upload(fileInput, file);
-    await user.click(screen.getByRole("button", { name: /add material/i }));
+    await user.click(screen.getByRole("button", { name: /share with coach/i }));
 
     expect(
       await screen.findByText(/Stored new activity update material: peer-tutoring.txt/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Patch status: applied/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Patch status:/i)).not.toBeInTheDocument();
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         "/api/demo/materials",
@@ -626,9 +677,10 @@ describe("CoachShell", () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
-    await user.click(screen.getAllByRole("button", { name: /paste update/i })[0]!);
+    await user.click(screen.getByRole("button", { name: /open attachment options/i }));
+    await user.click(screen.getByRole("button", { name: /paste something/i }));
     await user.selectOptions(screen.getByLabelText(/material type/i), "school_list");
     await user.clear(screen.getByLabelText(/title/i));
     await user.type(screen.getByLabelText(/title/i), "Maybe schools");
@@ -636,23 +688,26 @@ describe("CoachShell", () => {
       screen.getByLabelText(/material content/i),
       "Maybe some options are Purdue, Georgia Tech, UT Austin, and a few UC schools.",
     );
-    await user.click(screen.getByRole("button", { name: /add material/i }));
+    await user.click(screen.getByRole("button", { name: /share with coach/i }));
 
-    expect(await screen.findByText(/Patch status: needs_confirmation/i)).toBeInTheDocument();
-    expect(screen.getByText(/Affected fields: schoolList/i)).toBeInTheDocument();
-    expect(screen.getByText(/Latest material update/i)).toBeInTheDocument();
+    expect(await screen.findByText(/I found possible school names in your latest material\./i)).toBeInTheDocument();
+    expect(screen.queryByText(/Patch status:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Affected fields:/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Pick the schools that belong in your current shortlist/i)).toBeInTheDocument();
   });
 
   it("shows a conflict material analysis when a new score contradicts known testing", async () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
-    await user.click(screen.getByRole("button", { name: /try a sat update/i }));
-    await screen.findByText(/Patch status: applied/i);
+    await user.click(screen.getByRole("button", { name: /open workspace panel/i }));
+    await user.click(screen.getByRole("button", { name: /try sat sample/i }));
+    await screen.findByText(/Parsed SAT Math 760 and Reading and Writing 730/i);
 
-    await user.click(screen.getAllByRole("button", { name: /paste update/i })[0]!);
+    await user.click(screen.getByRole("button", { name: /open attachment options/i }));
+    await user.click(screen.getByRole("button", { name: /paste something/i }));
     await user.selectOptions(screen.getByLabelText(/material type/i), "test_score");
     await user.clear(screen.getByLabelText(/title/i));
     await user.type(screen.getByLabelText(/title/i), "Conflicting SAT");
@@ -660,54 +715,63 @@ describe("CoachShell", () => {
       screen.getByLabelText(/material content/i),
       "Updated SAT update: Math 700, Reading and Writing 680.",
     );
-    await user.click(screen.getByRole("button", { name: /add material/i }));
+    await user.click(screen.getByRole("button", { name: /share with coach/i }));
 
-    expect(await screen.findByText(/Patch status: conflict/i)).toBeInTheDocument();
-    expect(screen.getByText(/Affected fields: testingStatus/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /view latest brief/i })).toBeInTheDocument();
+    expect(await screen.findByText(/Your latest score update conflicts with the testing baseline/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Patch status:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Affected fields:/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Which testing baseline should I trust/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /see why i'm saying that/i })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /view latest brief/i }));
+    await user.click(screen.getByRole("button", { name: /see why i'm saying that/i }));
 
     expect(
       await screen.findByText(/Testing information is currently conflicting/i),
     ).toBeInTheDocument();
   });
 
-  it("shows current priorities in the notebook without bringing back a full brief rail", async () => {
+  it("keeps the main surface chat-first without rendering the old notebook rail", async () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
-    await user.click(screen.getByRole("button", { name: /try a sat update/i }));
+    await user.click(screen.getByRole("button", { name: /open workspace panel/i }));
+    await user.click(screen.getByRole("button", { name: /try sat sample/i }));
 
-    expect(await screen.findByText(/Current priorities/i)).toBeInTheDocument();
-    expect(screen.getByText(/Sort schools into reach, target, and safer-fit buckets/i)).toBeInTheDocument();
-    expect(screen.queryByText(/^Weekly Brief$/i)).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(/Parsed SAT Math 760 and Reading and Writing 730/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Patch status:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Current priorities/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/What the coach knows/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Open questions/i)).not.toBeInTheDocument();
   });
 
   it("shifts to execution-oriented follow-up after a brief-driving applied update", async () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
-    await user.click(screen.getByRole("button", { name: /try a sat update/i }));
+    await user.click(screen.getByRole("button", { name: /open workspace panel/i }));
+    await user.click(screen.getByRole("button", { name: /try sat sample/i }));
     await user.type(screen.getByLabelText(/message coach/i), "Thanks, what now?");
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /^send$/i }));
 
     expect(
-      await screen.findByText(/the next execution step is your school list/i),
+      await screen.findByText(/the next move is your school list/i),
     ).toBeInTheDocument();
   });
 
-  it("lets a user confirm a pending school list through chat and updates the notebook state", async () => {
+  it("lets a user confirm a pending school list through chat and updates the conversation state", async () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
-    await user.click(screen.getAllByRole("button", { name: /paste update/i })[0]!);
+    await user.click(screen.getByRole("button", { name: /open attachment options/i }));
+    await user.click(screen.getByRole("button", { name: /paste something/i }));
     await user.selectOptions(screen.getByLabelText(/material type/i), "school_list");
     await user.clear(screen.getByLabelText(/title/i));
     await user.type(screen.getByLabelText(/title/i), "Maybe schools");
@@ -715,14 +779,13 @@ describe("CoachShell", () => {
       screen.getByLabelText(/material content/i),
       "Maybe some options are Purdue, Georgia Tech, UT Austin, and a few UC schools.",
     );
-    await user.click(screen.getByRole("button", { name: /add material/i }));
-    await screen.findByText(/Patch status: needs_confirmation/i);
+    await user.click(screen.getByRole("button", { name: /share with coach/i }));
+    await screen.findByText(/Pick the schools that belong in your current shortlist/i);
 
-    await user.type(
-      screen.getByLabelText(/message coach/i),
-      "Yes, that is our current shortlist. Please use Purdue, Georgia Tech, and UT Austin.",
-    );
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /Purdue/i }));
+    await user.click(screen.getByRole("button", { name: /Georgia Tech/i }));
+    await user.click(screen.getByRole("button", { name: /UT Austin/i }));
+    await user.click(screen.getByRole("button", { name: /confirm shortlist/i }));
 
     expect(await screen.findByText(/confirmed\. I updated your school list/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Purdue, Georgia Tech, UT Austin/i).length).toBeGreaterThan(0);
@@ -733,12 +796,14 @@ describe("CoachShell", () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
-    await user.click(screen.getByRole("button", { name: /try a sat update/i }));
-    await screen.findByText(/Patch status: applied/i);
+    await user.click(screen.getByRole("button", { name: /open workspace panel/i }));
+    await user.click(screen.getByRole("button", { name: /try sat sample/i }));
+    await screen.findByText(/Parsed SAT Math 760 and Reading and Writing 730/i);
 
-    await user.click(screen.getAllByRole("button", { name: /paste update/i })[0]!);
+    await user.click(screen.getByRole("button", { name: /open attachment options/i }));
+    await user.click(screen.getByRole("button", { name: /paste something/i }));
     await user.selectOptions(screen.getByLabelText(/material type/i), "test_score");
     await user.clear(screen.getByLabelText(/title/i));
     await user.type(screen.getByLabelText(/title/i), "Conflicting SAT");
@@ -746,14 +811,13 @@ describe("CoachShell", () => {
       screen.getByLabelText(/material content/i),
       "Updated SAT update: Math 700, Reading and Writing 680.",
     );
-    await user.click(screen.getByRole("button", { name: /add material/i }));
-    await screen.findByText(/Patch status: conflict/i);
+    await user.click(screen.getByRole("button", { name: /share with coach/i }));
+    await screen.findByText(/Which testing baseline should I trust/i);
 
-    await user.type(screen.getByLabelText(/message coach/i), "Use the newer 700 and 680 score.");
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /Use latest:/i }));
+    await user.click(screen.getByRole("button", { name: /apply choice/i }));
 
     expect(await screen.findByText(/resolved\. I updated the testing profile to the newer score/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/SAT Math 700 \/ RW 680/i).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Patch status: conflict/i)).not.toBeInTheDocument();
   });
 
@@ -761,9 +825,10 @@ describe("CoachShell", () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
-    await user.click(screen.getAllByRole("button", { name: /paste update/i })[0]!);
+    await user.click(screen.getByRole("button", { name: /open attachment options/i }));
+    await user.click(screen.getByRole("button", { name: /paste something/i }));
     await user.selectOptions(screen.getByLabelText(/material type/i), "school_list");
     await user.clear(screen.getByLabelText(/title/i));
     await user.type(screen.getByLabelText(/title/i), "Maybe schools");
@@ -771,36 +836,34 @@ describe("CoachShell", () => {
       screen.getByLabelText(/material content/i),
       "Maybe some options are Purdue, Georgia Tech, UT Austin, and a few UC schools.",
     );
-    await user.click(screen.getByRole("button", { name: /add material/i }));
-    await screen.findByText(/Patch status: needs_confirmation/i);
+    await user.click(screen.getByRole("button", { name: /share with coach/i }));
+    await screen.findByText(/Pick the schools that belong in your current shortlist/i);
 
-    await user.type(
-      screen.getByLabelText(/message coach/i),
-      "Yes, that is our current shortlist. Please use Purdue, Georgia Tech, and UT Austin.",
-    );
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /Purdue/i }));
+    await user.click(screen.getByRole("button", { name: /Georgia Tech/i }));
+    await user.click(screen.getByRole("button", { name: /UT Austin/i }));
+    await user.click(screen.getByRole("button", { name: /confirm shortlist/i }));
     await screen.findByText(/confirmed\. I updated your school list/i);
 
     await user.type(
       screen.getByLabelText(/message coach/i),
       "Purdue and Georgia Tech are reach schools for us. UT Austin is target.",
     );
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /^send$/i }));
 
     expect(
       await screen.findByText(/bucketed school-list strategy with reach and target groups/i),
     ).toBeInTheDocument();
-    expect(screen.getAllByText(/Reach: Purdue, Georgia Tech/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Target: UT Austin/i).length).toBeGreaterThan(0);
   });
 
   it("lets a user continue from timing strategy into story and material priorities", async () => {
     const user = userEvent.setup();
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
 
-    await user.click(screen.getAllByRole("button", { name: /paste update/i })[0]!);
+    await user.click(screen.getByRole("button", { name: /open attachment options/i }));
+    await user.click(screen.getByRole("button", { name: /paste something/i }));
     await user.selectOptions(screen.getByLabelText(/material type/i), "school_list");
     await user.clear(screen.getByLabelText(/title/i));
     await user.type(screen.getByLabelText(/title/i), "Maybe schools");
@@ -808,41 +871,39 @@ describe("CoachShell", () => {
       screen.getByLabelText(/material content/i),
       "Maybe some options are Purdue, Georgia Tech, UT Austin, and a few UC schools.",
     );
-    await user.click(screen.getByRole("button", { name: /add material/i }));
-    await screen.findByText(/Patch status: needs_confirmation/i);
+    await user.click(screen.getByRole("button", { name: /share with coach/i }));
+    await screen.findByText(/Pick the schools that belong in your current shortlist/i);
 
-    await user.type(
-      screen.getByLabelText(/message coach/i),
-      "Yes, that is our current shortlist. Please use Purdue, Georgia Tech, and UT Austin.",
-    );
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /Purdue/i }));
+    await user.click(screen.getByRole("button", { name: /Georgia Tech/i }));
+    await user.click(screen.getByRole("button", { name: /UT Austin/i }));
+    await user.click(screen.getByRole("button", { name: /confirm shortlist/i }));
     await screen.findByText(/confirmed\. I updated your school list/i);
 
     await user.type(
       screen.getByLabelText(/message coach/i),
       "Purdue and Georgia Tech are reach schools for us. UT Austin is target.",
     );
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /^send$/i }));
     await screen.findByText(/bucketed school-list strategy with reach and target groups/i);
 
     await user.type(
       screen.getByLabelText(/message coach/i),
       "Purdue and Georgia Tech are early action for us. UT Austin is regular decision, and we do not want binding early decision.",
     );
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /^send$/i }));
     await screen.findByText(/captured that timing strategy/i);
 
     await user.type(
       screen.getByLabelText(/message coach/i),
       "For Purdue and Georgia Tech, our top material priority is leadership and STEM project stories first. UT Austin can wait until after early rounds.",
     );
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /^send$/i }));
 
     expect(
       await screen.findByText(/clearer story and material priority for the early-round schools/i),
     ).toBeInTheDocument();
-    expect(screen.getAllByText(/Prioritize the highest-leverage stories and materials first/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/leadership and STEM project stories/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/leadership and STEM project stories first/i)).toBeInTheDocument();
   });
 
   it("lets a user continue from story priorities into execution progress", async () => {
@@ -860,14 +921,14 @@ describe("CoachShell", () => {
     );
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
     await screen.findByText(/clearer story and material priority for the early-round schools/i);
 
     await user.type(
       screen.getByLabelText(/message coach/i),
       "We drafted the Purdue leadership story and collected robotics evidence for Georgia Tech this week.",
     );
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /^send$/i }));
 
     expect(
       await screen.findByText(/execution progress for the early-round materials is now real/i),
@@ -892,14 +953,14 @@ describe("CoachShell", () => {
     );
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
     await screen.findByText(/execution progress for the early-round materials is now real/i);
 
     await user.type(
       screen.getByLabelText(/message coach/i),
       "We are blocked because Purdue still needs a stronger leadership example and Georgia Tech needs clearer robotics proof.",
     );
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /^send$/i }));
 
     expect(
       await screen.findByText(/execution is blocked on a few specific proof gaps/i),
@@ -925,14 +986,14 @@ describe("CoachShell", () => {
     );
 
     render(<CoachShell />);
-    await screen.findByRole("heading", { name: /build your first admissions plan/i });
+    await screen.findByText(/I already have a light starting point for your family/i);
     await screen.findByText(/execution is blocked on a few specific proof gaps/i);
 
     await user.type(
       screen.getByLabelText(/message coach/i),
       "We now have the Purdue leadership example and clearer robotics proof for Georgia Tech, so those blockers are resolved.",
     );
-    await user.click(screen.getByRole("button", { name: /send message/i }));
+    await user.click(screen.getByRole("button", { name: /^send$/i }));
 
     expect(
       await screen.findByText(/the early-round package is now close enough to move into final polishing and review/i),

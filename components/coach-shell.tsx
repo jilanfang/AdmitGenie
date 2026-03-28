@@ -58,12 +58,15 @@ export function CoachShell() {
   const [isSendingConversation, setIsSendingConversation] = useState(false);
   const [isSwitchingPersona, setIsSwitchingPersona] = useState(false);
   const [isBriefOpen, setIsBriefOpen] = useState(false);
+  const [isWorkspacePanelOpen, setIsWorkspacePanelOpen] = useState(false);
+  const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false);
   const [conversationDraft, setConversationDraft] = useState("");
   const [materialComposerMode, setMaterialComposerMode] =
     useState<MaterialComposerMode>("closed");
   const [materialComposer, setMaterialComposer] =
     useState<MaterialComposerState>(DEFAULT_COMPOSER_STATE);
   const [workspaceCode, setWorkspaceCode] = useState("");
+  const [decisionSelection, setDecisionSelection] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -80,6 +83,7 @@ export function CoachShell() {
       setState(payload.data?.state ?? null);
       setDemoPersona(payload.data?.demoPersona ?? null);
       setDeployment(payload.data?.deployment ?? null);
+      setDecisionSelection([]);
       setIsLoading(false);
     };
 
@@ -115,6 +119,9 @@ export function CoachShell() {
       setDeployment(payload.data?.deployment ?? null);
       setIsBriefOpen(false);
       setConversationDraft("");
+      setDecisionSelection([]);
+      setIsWorkspacePanelOpen(false);
+      setIsAttachmentMenuOpen(false);
       closeMaterialComposer();
     } finally {
       setIsLoading(false);
@@ -143,6 +150,8 @@ export function CoachShell() {
       setState(payload.data?.state ?? null);
       setIsBriefOpen(false);
       setConversationDraft("");
+      setDecisionSelection([]);
+      setIsAttachmentMenuOpen(false);
     } finally {
       setIsSendingConversation(false);
     }
@@ -174,6 +183,8 @@ export function CoachShell() {
       setDemoPersona(payload.data?.demoPersona ?? null);
       setIsBriefOpen(false);
       setConversationDraft("");
+      setDecisionSelection([]);
+      setIsWorkspacePanelOpen(false);
       closeMaterialComposer();
     } finally {
       setIsSwitchingPersona(false);
@@ -196,6 +207,7 @@ export function CoachShell() {
 
   const openMaterialComposer = (mode: Exclude<MaterialComposerMode, "closed">) => {
     setMaterialComposerMode(mode);
+    setIsAttachmentMenuOpen(false);
     setMaterialComposer((current) => ({
       ...current,
       error: null,
@@ -268,187 +280,232 @@ export function CoachShell() {
   if (isLoading || !state) {
     return (
       <main className="coach-shell-page">
-        <div className="coach-shell-loading">Loading AdmitGenie...</div>
+        <div className="coach-shell-loading">Getting your coach ready...</div>
       </main>
     );
   }
 
-  const visibleFields = [
-    state.profileFields.gradeLevel,
-    {
-      label: "Direction",
-      value: state.studentProfile.majorDirection ?? "No major direction confirmed yet",
-      status: "known" as const,
-    },
-    state.profileFields.currentFocus,
-    state.profileFields.testingStatus,
-    state.profileFields.schoolList,
-    state.profileFields.applicationTiming,
-  ];
-  const missingFields = Object.values(state.profileFields).filter(
-    (field) => field.status !== "known",
-  );
-  const recentMaterials = state.materials.slice(0, 3);
   const latestMaterialAnalysis = state.materialAnalysis[0] ?? null;
   const shouldShowBriefEntry = latestMaterialAnalysis !== null;
+  const latestDecisionCard = state.decisionCard;
+  const suggestedReplies = state.suggestedReplies;
+  const selectedPersona =
+    demoPersona?.options.find((persona) => persona.slug === demoPersona.selectedSlug) ?? null;
+  const isDecisionReady =
+    latestDecisionCard?.type === "multi_select"
+      ? decisionSelection.length > 0
+      : decisionSelection.length === 1;
+
+  const handleDecisionToggle = (value: string) => {
+    if (!latestDecisionCard) {
+      return;
+    }
+
+    setDecisionSelection((current) => {
+      if (latestDecisionCard.type === "multi_select") {
+        return current.includes(value)
+          ? current.filter((item) => item !== value)
+          : [...current, value];
+      }
+
+      return current[0] === value ? [] : [value];
+    });
+  };
+
+  const handleDecisionSubmit = async () => {
+    if (!latestDecisionCard || !isDecisionReady) {
+      return;
+    }
+
+    if (latestDecisionCard.type === "multi_select") {
+      const schools = decisionSelection.join(", ");
+      await sendConversation(`Yes, that is our current shortlist. Please use ${schools}.`);
+      return;
+    }
+
+    const selectedOption = latestDecisionCard.options.find(
+      (option) => option.value === decisionSelection[0],
+    );
+
+    if (!selectedOption) {
+      return;
+    }
+
+    await sendConversation(selectedOption.value);
+  };
+
+  const handleSuggestedReply = async (message: string) => {
+    await sendConversation(message);
+  };
+
+  const formatConversationMessage = (message: string) => {
+    if (message.startsWith("Family: ")) {
+      return message.replace(/^Family:\s*/, "");
+    }
+
+    if (message.startsWith("Coach: ")) {
+      return message.replace(/^Coach:\s*/, "");
+    }
+
+    return message;
+  };
 
   return (
     <main className="coach-shell-page">
       <div className="chat-shell">
-        <aside className="chat-sidebar">
-          <div className="chat-sidebar__brand">
-            <div className="chat-sidebar__logo">AG</div>
-            <div>
-              <div className="chat-sidebar__title">AdmitGenie</div>
-              <div className="chat-sidebar__subtitle">AI admissions coach</div>
-            </div>
-          </div>
+        <button
+          className="chat-shell__panel-toggle"
+          type="button"
+          aria-expanded={isWorkspacePanelOpen}
+          aria-label="Open workspace panel"
+          onClick={() => setIsWorkspacePanelOpen((current) => !current)}
+        >
+          More
+        </button>
 
-          <button
-            className="chat-sidebar__new-chat"
-            type="button"
-            onClick={() => void startNewChat()}
-          >
-            New chat
-          </button>
-
-          <button
-            className="chat-sidebar__secondary-action"
-            type="button"
-            onClick={() => void leaveDemo()}
-          >
-            Leave demo
-          </button>
-
-          {demoPersona?.canSwitch ? (
-            <label className="chat-sidebar__control">
-              <span>Demo persona</span>
-              <select
-                aria-label="Demo persona"
-                value={demoPersona.selectedSlug}
-                disabled={isSwitchingPersona}
-                onChange={(event) => void switchPersona(event.target.value)}
-              >
-                {demoPersona.options.map((persona) => (
-                  <option key={persona.slug} value={persona.slug}>
-                    {persona.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-
-          <div className="chat-sidebar__section">
-            <div className="chat-sidebar__section-label">Recent chats</div>
-            <div className="chat-thread chat-thread--active">
-              First admissions plan
-            </div>
-            {demoPersona?.options.slice(0, 2).map((persona) => (
-              <div key={persona.slug} className="chat-thread">
-                {persona.name}
+        {isWorkspacePanelOpen ? (
+          <>
+            <button
+              className="chat-shell__panel-scrim"
+              type="button"
+              aria-label="Close workspace panel"
+              onClick={() => setIsWorkspacePanelOpen(false)}
+            />
+            <aside className="chat-side-panel">
+              <div className="chat-side-panel__header">
+                <strong>Behind the scenes</strong>
+                <button
+                  type="button"
+                  aria-label="Close workspace panel"
+                  onClick={() => setIsWorkspacePanelOpen(false)}
+                >
+                  Close
+                </button>
               </div>
-            ))}
-          </div>
 
-          <div className="chat-sidebar__section">
-            <div className="chat-sidebar__section-label">Workspace</div>
-            <div className="chat-sidebar__workspace-code">{workspaceCode}</div>
-          </div>
-
-          <div className="chat-sidebar__section">
-            <div className="chat-sidebar__section-label">Demo status</div>
-            <div className="chat-sidebar__meta-card">
-              <strong>
-                {deployment?.readyForSharedDemo ? "Durable Vercel demo" : "Ephemeral local demo"}
-              </strong>
-              <span>
-                {deployment?.readyForSharedDemo
-                  ? "State is persisted across sessions for this workspace."
-                  : "State is isolated by workspace, but memory mode resets when the process restarts."}
-              </span>
-            </div>
-          </div>
-
-          {demoPersona ? (
-            <div className="chat-sidebar__section">
-              <div className="chat-sidebar__section-label">Scenario</div>
-              <div className="chat-sidebar__meta-card">
-                <strong>
-                  {demoPersona.options.find((persona) => persona.slug === demoPersona.selectedSlug)
-                    ?.name ?? "Current scenario"}
-                </strong>
-                <span>
-                  {demoPersona.options.find((persona) => persona.slug === demoPersona.selectedSlug)
-                    ?.summary ?? "AI-native admissions coaching demo scenario."}
-                </span>
+              <div className="chat-side-panel__section">
+                <button
+                  style={composerButtonStyle}
+                  type="button"
+                  onClick={() => void startNewChat()}
+                >
+                  New chat
+                </button>
+                <button
+                  style={composerButtonStyle}
+                  type="button"
+                  onClick={() => void applySatUpdate()}
+                >
+                  {isApplyingMaterial ? "Updating..." : "Try SAT sample"}
+                </button>
               </div>
-            </div>
-          ) : null}
 
-          <div className="chat-sidebar__footer">
-            {state.studentProfile.firstName ?? "Student"}
-          </div>
-        </aside>
+              {demoPersona?.canSwitch ? (
+                <label className="chat-side-panel__field">
+                  <span>Demo persona</span>
+                  <select
+                    aria-label="Demo persona"
+                    value={demoPersona.selectedSlug}
+                    disabled={isSwitchingPersona}
+                    onChange={(event) => void switchPersona(event.target.value)}
+                  >
+                    {demoPersona.options.map((persona) => (
+                      <option key={persona.slug} value={persona.slug}>
+                        {persona.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
 
-        <section className="chat-main">
-          <header className="chat-main__header">
-            <div className="chat-main__eyebrow">Coach-led intake</div>
-            <h1 className="chat-main__title">Build your first admissions plan.</h1>
-            <p className="chat-main__subtitle">
-              I can help you build your first admissions plan through conversation,
-              not a giant intake form. Start with your grade, what you&apos;re aiming
-              for, and what feels most unclear right now.
-            </p>
-            {deployment && !deployment.readyForSharedDemo ? (
-              <div className="chat-main__warning">
-                <strong>Ephemeral demo mode</strong>
-                <span>{deployment.blocker}</span>
+              <div className="chat-side-panel__note">
+                <strong>{selectedPersona?.name ?? "Current scenario"}</strong>
+                <p>{selectedPersona?.summary ?? "Current coaching scenario."}</p>
+                <small>
+                  {deployment?.readyForSharedDemo
+                    ? "This case is running in durable mode and will still be here when you come back."
+                    : "This case is running in local memory mode, so it resets if the demo restarts."}
+                </small>
               </div>
-            ) : null}
-            <div>
+
+              <div className="chat-side-panel__meta">
+                <span>Workspace code: {workspaceCode}</span>
+                {deployment?.blocker ? (
+                  <small>{deployment.blocker}</small>
+                ) : null}
+              </div>
+
               <button
-                style={composerButtonStyle}
+                className="chat-side-panel__link"
                 type="button"
-                onClick={() => setIsBriefOpen((current) => !current)}
+                onClick={() => void leaveDemo()}
               >
-                {isBriefOpen ? "Hide current brief" : "View current brief"}
+                Leave demo
               </button>
-            </div>
+            </aside>
+          </>
+        ) : null}
+
+        <section className="chat-main chat-main--single-column">
+          <header className="sr-only">
+            <h1>Let&apos;s figure out the next best step.</h1>
+            <p>
+              Tell me what grade you&apos;re in, what you&apos;re aiming for, or what feels most unclear.
+              If you already have a score report, school list, or update, drop it here and I&apos;ll help you turn it into a plan.
+            </p>
           </header>
 
           <div className="chat-main__stream">
             {state.conversation.map((message, index) => {
                 const isUser = message.startsWith("Family:");
-                const bubbleClass = isUser
-                  ? "chat-bubble chat-bubble--user"
-                  : "chat-bubble chat-bubble--coach";
-                const isOpening = index === 0;
+                const isOpeningCoach = !isUser && index < 2;
+                const isSummaryCoach =
+                  !isUser &&
+                  /here's where i think things stand:|what i'd focus on this month:|what would help me guide you better next:/i.test(
+                    message,
+                  );
+                const bubbleClass = [
+                  "chat-bubble",
+                  isUser ? "chat-bubble--user" : "chat-bubble--coach",
+                  isOpeningCoach
+                    ? index === 0
+                      ? "chat-bubble--opening-primary"
+                      : "chat-bubble--opening-secondary"
+                    : "",
+                  isSummaryCoach ? "chat-bubble--summary" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ");
 
                 return (
                   <article key={`${message}-${index}`} className={bubbleClass}>
-                    <div className="chat-bubble__label">
-                      {isUser ? "You" : isOpening ? "Coach opening" : "Coach"}
-                    </div>
-                    <p>{message}</p>
+                    <p>{formatConversationMessage(message)}</p>
                   </article>
                 );
               })}
 
+            {suggestedReplies.length > 0 ? (
+              <article className="chat-bubble chat-bubble--coach chat-bubble--suggested">
+                <div className="chat-bubble__label">You can say it like this</div>
+                <div className="suggested-replies">
+                  {suggestedReplies.map((reply) => (
+                    <button
+                      key={reply.id}
+                      className="suggested-replies__option"
+                      type="button"
+                      onClick={() => void handleSuggestedReply(reply.message)}
+                    >
+                      {reply.label}
+                    </button>
+                  ))}
+                </div>
+              </article>
+            ) : null}
+
             {latestMaterialAnalysis ? (
-              <article className="chat-bubble chat-bubble--system">
-                <div className="chat-bubble__label">Material update</div>
+              <article className="chat-bubble chat-bubble--coach chat-bubble--insert">
+                <div className="chat-bubble__label">A note from me</div>
                 <p>{state.patches[0]?.summary}</p>
-                <p className="chat-bubble__meta">
-                  Patch status: {latestMaterialAnalysis.patchStatus}
-                </p>
-                <p className="chat-bubble__meta">
-                  Affected fields: {latestMaterialAnalysis.affectedFields.join(", ")}
-                </p>
-                {latestMaterialAnalysis.extractedFacts.length > 0 ? (
-                  <p className="chat-bubble__meta">
-                    Extracted facts: {latestMaterialAnalysis.extractedFacts.join(", ")}
-                  </p>
-                ) : null}
                 <p className="chat-bubble__meta">{latestMaterialAnalysis.profileImpact}</p>
                 {shouldShowBriefEntry ? (
                   <button
@@ -456,55 +513,97 @@ export function CoachShell() {
                     type="button"
                     onClick={() => setIsBriefOpen((current) => !current)}
                   >
-                    {isBriefOpen ? "Hide latest brief" : "View latest brief"}
+                    {isBriefOpen ? "Hide the extra detail" : "See why I'm saying that"}
                   </button>
                 ) : null}
               </article>
             ) : null}
 
+            {latestDecisionCard ? (
+              <article className="chat-bubble chat-bubble--coach chat-bubble--decision chat-bubble--insert">
+                <div className="chat-bubble__label">One thing to confirm</div>
+                <p><strong>{latestDecisionCard.prompt}</strong></p>
+                <p className="chat-bubble__meta">{latestDecisionCard.reason}</p>
+                <div className="decision-card">
+                  {latestDecisionCard.options.map((option) => {
+                    const isSelected = decisionSelection.includes(option.value);
+
+                    return (
+                      <button
+                        key={option.id}
+                        className={`decision-card__option${isSelected ? " decision-card__option--selected" : ""}`}
+                        type="button"
+                        onClick={() => handleDecisionToggle(option.value)}
+                      >
+                        <strong>{option.label}</strong>
+                        <span>{option.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  className="chat-composer__send"
+                  type="button"
+                  onClick={() => void handleDecisionSubmit()}
+                  disabled={!isDecisionReady || isSendingConversation}
+                >
+                  {isSendingConversation ? "Saving..." : latestDecisionCard.submitLabel}
+                </button>
+              </article>
+            ) : null}
+
             {isBriefOpen ? (
-              <article className="chat-bubble chat-bubble--system">
-                <div className="chat-bubble__label">Monthly brief</div>
-                <p><strong>What changed</strong></p>
-                <p>{state.weeklyBrief.whatChanged}</p>
-                <p><strong>What matters now</strong></p>
-                <p>{state.weeklyBrief.whatMatters}</p>
-                <p><strong>Top actions</strong></p>
-                <p>{state.weeklyBrief.topActions.join(" ")}</p>
-                <p><strong>Risks</strong></p>
-                <p>{state.weeklyBrief.risks.join(" ")}</p>
-                <p><strong>Why this advice</strong></p>
-                <p>{state.weeklyBrief.whyThisAdvice}</p>
+              <article className="chat-bubble chat-bubble--coach chat-bubble--insert">
+                <div className="chat-bubble__label">Why I am taking this angle</div>
+                <p>
+                  <strong>What changed:</strong> {state.weeklyBrief.whatChanged}
+                </p>
+                <p>
+                  <strong>What matters most right now:</strong> {state.weeklyBrief.whatMatters}
+                </p>
+                <p>
+                  <strong>What I'd do next:</strong> {state.weeklyBrief.topActions.join(" ")}
+                </p>
+                <p>
+                  <strong>What I want us to watch:</strong> {state.weeklyBrief.risks.join(" ")}
+                </p>
+                <p>
+                  <strong>Why I'm taking this angle:</strong> {state.weeklyBrief.whyThisAdvice}
+                </p>
               </article>
             ) : null}
           </div>
 
           <div className="chat-composer">
-            <div className="chat-composer__tools">
-              <button
-                style={composerButtonStyle}
-                type="button"
-                onClick={() => openMaterialComposer("upload")}
-              >
-                Upload file
-              </button>
-              <button
-                style={composerButtonStyle}
-                type="button"
-                onClick={() => openMaterialComposer("paste")}
-              >
-                Paste update
-              </button>
-              <button
-                style={composerButtonStyle}
-                type="button"
-                onClick={() => void applySatUpdate()}
-              >
-                {isApplyingMaterial ? "Updating..." : "Try a SAT update"}
-              </button>
-            </div>
+            {isAttachmentMenuOpen ? (
+              <div className="chat-composer__attachment-menu">
+                <button
+                  style={composerButtonStyle}
+                  type="button"
+                  onClick={() => openMaterialComposer("upload")}
+                >
+                  Upload something
+                </button>
+                <button
+                  style={composerButtonStyle}
+                  type="button"
+                  onClick={() => openMaterialComposer("paste")}
+                >
+                  Paste something
+                </button>
+              </div>
+            ) : null}
 
             <div className="chat-composer__surface">
+              <button
+                className="chat-composer__attachment-trigger"
+                type="button"
+                aria-label="Open attachment options"
+                aria-expanded={isAttachmentMenuOpen}
+                onClick={() => setIsAttachmentMenuOpen((current) => !current)}
+              >
+                +
+              </button>
               <label className="chat-composer__input-wrap">
                 <span className="sr-only">Message coach</span>
                 <textarea
@@ -512,17 +611,19 @@ export function CoachShell() {
                   className="chat-composer__input"
                   value={conversationDraft}
                   onChange={(event) => setConversationDraft(event.target.value)}
-                  placeholder="Tell the coach what grade you're in, what you're aiming for, and what feels most uncertain."
+                  placeholder="Tell the coach what grade you're in, what you're aiming for, what feels unclear, or say that you want to add a score, school list, or update."
                 />
               </label>
-              <button
-                className="chat-composer__send"
-                type="button"
-                onClick={() => void handleConversationSubmit()}
-                disabled={isSendingConversation}
-              >
-                {isSendingConversation ? "Sending..." : "Send message"}
-              </button>
+              <div className="chat-composer__actions">
+                <button
+                  className="chat-composer__send"
+                  type="button"
+                  onClick={() => void handleConversationSubmit()}
+                  disabled={isSendingConversation}
+                >
+                  {isSendingConversation ? "Sending..." : "Send"}
+                </button>
+              </div>
             </div>
 
             {materialComposerMode !== "closed" ? (
@@ -530,8 +631,8 @@ export function CoachShell() {
                 <div className="chat-material-sheet__header">
                   <strong>
                     {materialComposerMode === "upload"
-                      ? "Upload a text file"
-                      : "Paste a new material update"}
+                      ? "Share a file"
+                      : "Paste something new"}
                   </strong>
                   <button type="button" onClick={closeMaterialComposer}>
                     Cancel
@@ -540,7 +641,7 @@ export function CoachShell() {
 
                 <div className="chat-material-sheet__grid">
                   <label>
-                    <span>Material type</span>
+                    <span>What is this?</span>
                     <select
                       aria-label="Material type"
                       value={materialComposer.type}
@@ -559,7 +660,7 @@ export function CoachShell() {
                   </label>
 
                   <label>
-                    <span>Title</span>
+                    <span>Short label</span>
                     <input
                       aria-label="Title"
                       value={materialComposer.title}
@@ -568,14 +669,14 @@ export function CoachShell() {
                           title: event.target.value,
                         })
                       }
-                      placeholder="Name this update"
+                      placeholder="Give this a short name"
                     />
                   </label>
                 </div>
 
                 {materialComposerMode === "upload" ? (
                   <label className="chat-material-sheet__upload">
-                    <span>File upload</span>
+                    <span>Choose a file</span>
                     <input
                       aria-label="File upload"
                       type="file"
@@ -586,7 +687,7 @@ export function CoachShell() {
                 ) : null}
 
                 <label className="chat-material-sheet__field">
-                  <span>Material content</span>
+                  <span>What do you want me to look at?</span>
                   <textarea
                     aria-label="Material content"
                     value={materialComposer.content}
@@ -595,7 +696,7 @@ export function CoachShell() {
                         content: event.target.value,
                       })
                     }
-                    placeholder="Paste a score update, activity note, school list, or family context."
+                    placeholder="Paste a score, school list, activity, or family update."
                   />
                 </label>
 
@@ -616,104 +717,12 @@ export function CoachShell() {
                   type="button"
                   onClick={() => void handleMaterialSubmit()}
                 >
-                  {isApplyingMaterial ? "Adding..." : "Add material"}
+                  {isApplyingMaterial ? "Adding..." : "Share with coach"}
                 </button>
               </div>
             ) : null}
           </div>
         </section>
-
-        <aside className="chat-notebook">
-          <section className="chat-notebook__card">
-            <div className="chat-notebook__label">What I know</div>
-            <div className="chat-notebook__list">
-              {visibleFields.map((field) => (
-                <article key={field.label} className="chat-notebook__item">
-                  <div className="chat-notebook__item-label">{field.label}</div>
-                  <div className="chat-notebook__item-value">{field.value}</div>
-                  <div className={`chat-status chat-status--${field.status}`}>
-                    {field.status}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="chat-notebook__card">
-            <div className="chat-notebook__label">What’s missing</div>
-            <div className="chat-notebook__list">
-              {missingFields.slice(0, 3).map((field) => (
-                <article key={field.label} className="chat-notebook__item">
-                  <div className="chat-notebook__item-label">{field.label}</div>
-                  <div className="chat-notebook__item-value">{field.value}</div>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="chat-notebook__card">
-            <div className="chat-notebook__label">Add material</div>
-            <div className="chat-notebook__actions">
-              <button
-                style={composerButtonStyle}
-                type="button"
-                onClick={() => openMaterialComposer("upload")}
-              >
-                Upload file
-              </button>
-              <button
-                style={composerButtonStyle}
-                type="button"
-                onClick={() => openMaterialComposer("paste")}
-              >
-                Paste update
-              </button>
-            </div>
-            {recentMaterials.length > 0 ? (
-              <div className="chat-notebook__recent">
-                {recentMaterials.map((material) => (
-                  <div key={material.id} className="chat-notebook__recent-item">
-                    <strong>{material.title}</strong>
-                    <span>{material.type.replaceAll("_", " ")}</span>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </section>
-
-          {latestMaterialAnalysis ? (
-            <section className="chat-notebook__card">
-              <div className="chat-notebook__label">Latest material update</div>
-              <div className="chat-notebook__list">
-                <article className="chat-notebook__item">
-                  <div className="chat-notebook__item-label">Patch status</div>
-                  <div className="chat-notebook__item-value">
-                    {latestMaterialAnalysis.patchStatus}
-                  </div>
-                </article>
-                <article className="chat-notebook__item">
-                  <div className="chat-notebook__item-label">Affected fields</div>
-                  <div className="chat-notebook__item-value">
-                    {latestMaterialAnalysis.affectedFields.join(", ")}
-                  </div>
-                </article>
-              </div>
-            </section>
-          ) : null}
-
-          {latestMaterialAnalysis ? (
-            <section className="chat-notebook__card">
-              <div className="chat-notebook__label">Current priorities</div>
-              <div className="chat-notebook__list">
-                {state.weeklyBrief.topActions.slice(0, 2).map((action) => (
-                  <article key={action} className="chat-notebook__item">
-                    <div className="chat-notebook__item-value">{action}</div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          ) : null}
-        </aside>
       </div>
     </main>
   );

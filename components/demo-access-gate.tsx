@@ -43,20 +43,23 @@ export function DemoAccessGate() {
   return (
     <main className="demo-access-page">
       <section className="demo-access-card">
-        <div className="demo-access-card__eyebrow">AdmitGenie Demo</div>
-        <h1 className="demo-access-card__title">Enter Demo Access</h1>
+        <div className="demo-access-card__eyebrow">Private admissions coach</div>
+        <h1 className="demo-access-card__title">Step into the conversation.</h1>
         <p className="demo-access-card__body">
-          Use the shared demo access code to enter the AI-native coach inbox.
+          Enter the shared code and you will land directly inside the coach conversation. No setup, no dashboard tour.
+        </p>
+        <p className="demo-access-card__aside">
+          One quiet thread. One coach. Start wherever the family actually is.
         </p>
 
         <label className="demo-access-card__field">
-          <span>Access code</span>
+          <span>Shared access code</span>
           <input
             aria-label="Access code"
             type="password"
             value={accessCode}
             onChange={(event) => setAccessCode(event.target.value)}
-            placeholder="Enter demo access code"
+            placeholder="Enter the shared code"
           />
         </label>
 
@@ -68,7 +71,7 @@ export function DemoAccessGate() {
           onClick={() => void handleSubmit()}
           disabled={isSubmitting}
         >
-          {isSubmitting ? "Entering..." : "Enter demo"}
+          {isSubmitting ? "Entering..." : "Enter the coach"}
         </button>
       </section>
     </main>

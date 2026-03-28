@@ -26,9 +26,9 @@ describe("HomePage", () => {
 
     render(page);
 
-    expect(screen.getByText(/Enter Demo Access/i)).toBeInTheDocument();
+    expect(screen.getByText(/Step into the conversation/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/Use the shared demo access code to enter the AI-native coach inbox/i),
+      screen.getByText(/Enter the shared code and you will land directly inside the coach conversation/i),
     ).toBeInTheDocument();
   });
 

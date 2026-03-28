@@ -16,6 +16,9 @@ import {
 } from "@/lib/domain/demo-contracts";
 import {
   createInitialDemoState,
+  deriveDecisionCard,
+  deriveSuggestedReplies,
+  type DecisionCard,
   type DemoState,
   type MaterialDraft,
   type MaterialType,
@@ -82,6 +85,8 @@ export type CoachSnapshot = {
   materialAnalysis: DemoState["materialAnalysis"];
   weeklyBrief: DemoState["weeklyBrief"];
   profileFields: DemoState["profileFields"];
+  decisionCard: DecisionCard | null;
+  suggestedReplies: ReturnType<typeof deriveSuggestedReplies>;
 };
 
 export type DemoPersonaConfig = {
@@ -424,7 +429,7 @@ export function hydrateDemoStateFromPersistenceRows(
         }))
       : starterState.patches;
 
-  return {
+  const snapshot: Omit<CoachSnapshot, "decisionCard" | "suggestedReplies"> = {
     household: entitySummary.household,
     studentProfile: entitySummary.studentProfile,
     conversation:
@@ -451,12 +456,7 @@ export function hydrateDemoStateFromPersistenceRows(
         ? sortedPatches.map((item) => ({
             id: `analysis-${item.id}`,
             materialType: inferMaterialTypeFromPatch(item),
-            patchStatus:
-              item.status === "applied" ||
-              item.status === "needs_confirmation" ||
-              item.status === "conflict"
-                ? item.status
-                : "applied",
+            patchStatus: toProfilePatchStatus(item.status),
             extractedFacts: inferExtractedFactsFromPatch(item),
             affectedFields: inferAffectedFieldsFromPatch(item),
             profileImpact: item.impactSummary,
@@ -489,6 +489,12 @@ export function hydrateDemoStateFromPersistenceRows(
           whyThisAdvice: latestBrief.whyThisAdvice,
         }
       : starterState.weeklyBrief,
+  };
+
+  return {
+    ...snapshot,
+    decisionCard: deriveDecisionCard(snapshotToDemoState(snapshot)),
+    suggestedReplies: deriveSuggestedReplies(snapshotToDemoState(snapshot)),
   };
 }
 
@@ -742,10 +748,14 @@ function snapshotFromState(
     materialAnalysis: state.materialAnalysis,
     weeklyBrief: state.weeklyBrief,
     profileFields: state.profileFields,
+    decisionCard: deriveDecisionCard(state),
+    suggestedReplies: deriveSuggestedReplies(state),
   };
 }
 
-function snapshotToDemoState(snapshot: CoachSnapshot): DemoState {
+function snapshotToDemoState(
+  snapshot: Omit<CoachSnapshot, "decisionCard" | "suggestedReplies"> | CoachSnapshot,
+): DemoState {
   return {
     conversation: snapshot.conversation,
     materials: snapshot.materials,

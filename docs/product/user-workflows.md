@@ -1,169 +1,300 @@
 # User Workflows
 
+## Source Of Truth
+
+This document derives from:
+
+- `docs/product/canonical-product-blueprint-zh.md`
+- `AGENTS.md`
+
+If there is a conflict, the canonical blueprint wins.
+
 ## Overview
 
-AdmitGenie MVP supports four primary workflows:
+AdmitGenie MVP should now be understood as one continuous active-case product, not four disconnected features.
 
-1. First-time guided onboarding
-2. Ongoing chat-based enrichment
-3. Add new material and update profile state
-4. Review and act on the Monthly Brief
+The primary workflows are:
 
-## Workflow 1: First-Time Guided Onboarding
+1. Activate an active case for the first time
+2. Resume a returning case with recap and reopen logic
+3. Ingest new source material through the canonical intake pipeline
+4. Resolve decisions and promote trustworthy state
+5. Act through the living brief and `one next move`
+6. Publish a lightweight monthly checkpoint snapshot
+7. Switch among multiple cases without becoming a dashboard
+
+## Shared Interaction Rule
+
+All workflows should feel like one continuous coach conversation.
+
+- The main path is always the active case chat thread.
+- Material entry is a lightweight attachment path beside the chat composer, not a separate operating surface.
+- Imports and migrated notes still enter the same canonical intake pipeline as chat and uploads.
+- When explicit confirmation is required, the system should branch into inline decision cards inside the chat flow.
+- Decision cards are limited to:
+  - `yes/no`
+  - `single-select`
+  - `multi-select`
+- The coach should summarize the current brief in the conversation before asking the user to open the fuller brief.
+- Source grounding should be available on demand, but never dominate the default surface.
+
+## Workflow 1: First-Time Active Case Activation
 
 ```text
-USER ARRIVES
+USER LOGS IN
+    |
+    v
+ACTIVE CASE OPENS
     |
     v
 COACH WELCOME
     |
     v
-GUIDED INTERVIEW (4-6 high-value questions)
+GUIDED INTERVIEW (4-6 high-value turns)
     |
-    +--> USER ADDS MATERIAL EARLY
+    +--> USER ATTACHES OR IMPORTS MATERIAL
     |        |
     |        v
-    |    MATERIAL PARSED
+    |    RAW SOURCE STORED
     |        |
     |        v
-    |    PROFILE PATCH PROPOSED
+    |    CANDIDATE FACTS EXTRACTED
     |
     v
-INITIAL PROFILE SYNTHESIS
+STARTER UNDERSTANDING
     |
     v
-FIRST RECOMMENDATION + MISSING INFO PROMPT
+ONE NEXT MOVE + FIRST BRIEF SUMMARY
     |
     v
-ENTER COACH INBOX
+CASE RECAP SEED CREATED
 ```
 
 ### Success Condition
 
-The user gets value before completing a large structured profile.
+The user gets value before completing a large structured profile, and the case now has enough state to support a strong returning opening.
 
-## Workflow 2: Ongoing Chat-Based Enrichment
+## Workflow 2: Returning Case Resume And Reopen
 
 ```text
-USER RETURNS
+USER RETURNS TO ACTIVE CASE
     |
     v
-OPENS COACH INBOX
+CASE RECAP LOADED
     |
     v
-RESPONDS TO FOLLOW-UP QUESTION
+COACH OPENS WITH:
+  - since last time
+  - confirmed changes
+  - unresolved decisions
+  - one next move
+    |
+    +--> CASE REOPENED BY RULE?
+    |        |
+    |        +--> yes: explain why now
     |
     v
-SYSTEM EXTRACTS NEW FACTS
+USER RESPONDS / ACTS / UPLOADS
     |
     v
-PROFILE PATCH CREATED
-    |
-    +--> CONFIRM NEEDED? -- yes --> USER CONFIRMS / CORRECTS
-    |                         |
-    |                         no
-    v
-PROFILE STATE UPDATED
-    |
-    v
-NEXT BRIEF BECOMES MORE PRECISE
+CASE PROGRESS UPDATED
 ```
 
-### Typical Examples
+### Success Condition
 
-- user clarifies intended major direction
-- user says they have started a new club project
-- user corrects a previous score or timeline
+The user feels the coach remembers the case without rereading the whole history, and knows why the case is active again.
 
-## Workflow 3: Add New Material
+## Workflow 3: Source-Grounded Intake
 
 ```text
-USER SUBMITS MATERIAL
+USER CHATS / UPLOADS / IMPORTS
     |
     v
-ITEM STORED AS MATERIALITEM
+RAW SOURCE STORED
     |
     v
-CLASSIFY MATERIAL TYPE
+CLASSIFY SOURCE
     |
     v
-EXTRACT FACTS
+EXTRACT CANDIDATE FACTS
     |
     v
-PROPOSE PROFILE PATCH
+LINK CANDIDATES TO SOURCE SNIPPETS
     |
-    +--> LOW RISK ---------> APPLY + SUMMARIZE
-    |
-    +--> NEEDS CONFIRM ---> ASK USER
-    |
-    +--> CONFLICT --------> FLAG CONFLICT + ASK USER
+    +--> LOW RISK CANDIDATE ------+
+    |                             |
+    +--> NEEDS CONFIRM -----------> DECISION ITEM CREATED
+    |                             |
+    +--> CONFLICT ----------------+
     |
     v
-TRIGGER BRIEF UPDATE OR HOLD FOR NEXT BRIEF
+CHAT SUMMARY OF WHAT THE SYSTEM FOUND
 ```
 
-### Material Examples
+### Success Condition
 
-- transcript update
-- SAT score report
-- activity summary
-- new school shortlist
-- essay brainstorm note
+Every meaningful input enters the same trustworthy chain:
 
-## Workflow 4: Monthly Brief Review
+`raw source -> candidate facts -> decision -> confirmed state`
+
+## Workflow 4: Decision Resolution And State Promotion
 
 ```text
-MONTHLY BRIEF AVAILABLE
+DECISION ITEM EXISTS
     |
     v
-USER READS:
+COACH EXPLAINS:
+  - what needs confirmation
+  - why it matters
+    |
+    v
+INLINE CARD
+    |
+    +--> USER CONFIRMS / CHOOSES
+    |        |
+    |        v
+    |    CONFIRMED FACTS WRITTEN
+    |        |
+    |        v
+    |    STRATEGY STATE UPDATED
+    |
+    +--> USER DEFERS / BLOCKED
+             |
+             v
+         BLOCKER TYPE STORED
+```
+
+### Success Condition
+
+Important state changes are explicit, reversible, and auditable rather than silently inferred.
+
+## Workflow 5: Living Brief And One Next Move
+
+```text
+STRATEGY STATE CHANGES
+    |
+    v
+LIVING BRIEF UPDATED
+    |
+    v
+COACH SUMMARIZES IN CHAT:
   - what changed
   - what matters now
-  - top 3 actions
-  - risks
-  - why this advice
+  - one next move
+  - why this move
     |
-    +--> USER ACTS ON TASK
+    +--> USER OPENS EXPANDED BRIEF IF NEEDED
     |
-    +--> USER ASKS FOLLOW-UP
+    +--> USER COMPLETES MOVE
     |
-    +--> USER ADDS NEW MATERIAL
+    +--> USER MARKS BLOCKED / DEFERRED
     |
     v
-COACH UPDATES PROFILE + NEXT RECOMMENDATION LOOP
+OUTCOME WRITTEN BACK TO CASE PROGRESS
 ```
 
 ### Success Condition
 
-The brief creates action, not passive reading.
+The brief creates action instead of becoming a passive report, and the system learns what happened to the recommended next move.
+
+## Workflow 6: Monthly Checkpoint Snapshot
+
+```text
+LIVING BRIEF HAS ENOUGH MOVEMENT
+    |
+    v
+COACH PROPOSES CHECKPOINT
+    |
+    v
+LIGHTWEIGHT CARD CONFIRMATION
+    |
+    +--> CONFIRMED
+    |      |
+    |      v
+    |   SNAPSHOT PUBLISHED
+    |      |
+    |      v
+    |   ENDORSEMENT STATE STORED
+    |
+    +--> NOT YET
+           |
+           v
+        LIVING BRIEF CONTINUES
+```
+
+### Success Condition
+
+The product maintains a stable family-shared checkpoint without freezing the brief into a stale monthly document.
+
+## Workflow 7: Multi-Case Attention Without A Dashboard
+
+```text
+USER HAS MULTIPLE CASES
+    |
+    v
+ACTIVE CASE OPENS BY DEFAULT
+    |
+    v
+LOW-EMPHASIS CASE SWITCHER
+    |
+    v
+ATTENTION SIGNALS SHOWN:
+  - needs decision
+  - new source waiting
+  - blocked next move
+  - deadline-sensitive reopen
+    |
+    v
+USER SWITCHES INTO NEXT ACTIVE CASE
+```
+
+### Success Condition
+
+Counselor and multi-case users can navigate attention without the product becoming an inbox or task dashboard.
 
 ## Edge Cases
 
 ### Sparse User
 
-- minimal responses
-- no materials
-- no school list yet
-
 Desired behavior:
-- provide a low-confidence brief
-- ask for one next useful input
+
+- provide a low-confidence starter understanding
+- still give one credible next move
+- keep the case open for a strong returning recap later
 
 ### Conflicting User Data
 
-- transcript says one GPA
-- user states another
-
 Desired behavior:
-- mark as conflicting
+
+- mark the candidate as conflicting
 - do not silently overwrite
+- resolve through an inline card when possible
 
-### No Meaningful Monthly Change
+### Imported Messy Case
 
 Desired behavior:
-- still produce a lightweight brief
-- focus on continuity and current priorities
+
+- preserve raw sources
+- extract candidate facts
+- show a coach-led synthesis in chat
+- require confirmation before durable promotion
+
+### Stale School Knowledge
+
+Desired behavior:
+
+- degrade to general guidance
+- avoid high-confidence school-specific writes
+- explain when a school-sensitive claim needs refresh
+
+### No Meaningful Monthly Movement
+
+Desired behavior:
+
+- keep the living brief current
+- avoid forcing a formal snapshot
+- focus on continuity, blockers, and the best next move
 
 ## Product Takeaway
 
-The app should feel continuous. Users should not experience a hard line between intake, profile management, and coaching.
+The app should still feel singular. Users should not feel a hard line between intake, coaching, profile management, source review, and monthly planning.

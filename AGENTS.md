@@ -11,6 +11,13 @@ The MVP is explicitly:
 - designed for progressive profile building instead of one-time intake completion
 - optimized for a Vercel-first TypeScript stack
 
+## Product Source Of Truth
+
+- The canonical product blueprint lives at:
+  - `docs/product/canonical-product-blueprint-zh.md`
+- When product docs drift, treat the blueprint as the product source of truth and sync derived docs from it.
+- `docs/product/founder-priority-user-journeys-zh.md`, `docs/product/onboarding-v1.md`, and `docs/product/user-workflows.md` should derive from the blueprint instead of redefining core product shape independently.
+
 ## Product Truths Learned So Far
 
 - Do not drift back toward CollegeVine-style heavy structured onboarding.

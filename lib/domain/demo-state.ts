@@ -65,6 +65,30 @@ export type MaterialAnalysis = {
   profileImpact: string;
 };
 
+export type DecisionCardType = "yes_no" | "single_select" | "multi_select";
+
+export type DecisionCardOption = {
+  id: string;
+  label: string;
+  description: string;
+  value: string;
+};
+
+export type DecisionCard = {
+  type: DecisionCardType;
+  prompt: string;
+  reason: string;
+  options: DecisionCardOption[];
+  appliesToPatchId: string;
+  submitLabel: string;
+};
+
+export type SuggestedReply = {
+  id: string;
+  label: string;
+  message: string;
+};
+
 export type DemoState = {
   conversation: string[];
   materials: MaterialItem[];
@@ -78,8 +102,8 @@ export type DemoState = {
 export function createInitialDemoState(): DemoState {
   return {
     conversation: [
-      "Welcome back. I am starting from a light profile: a North America family in the 9th-11th grade range, likely interested in selective schools, but the school list and testing details still need confirmation.",
-      "Guided interview: tell me your grade, what feels most uncertain right now, and whether you already have a school list.",
+      "I already have a light starting point for your family: you are somewhere in the 9th-11th grade range, aiming high, but the school list and testing picture are still too fuzzy for strong advice.",
+      "Let's make this simple. Tell me your grade, what feels most uncertain right now, and whether you already have a school list.",
     ],
     materials: [],
     patches: [],
@@ -297,6 +321,120 @@ export function resolvePendingTestingConflict(
         "Resolving testing conflict restores trust in the academic baseline, which is necessary before the coach can give sharper school-fit guidance.",
     },
   };
+}
+
+export function deriveDecisionCard(state: DemoState): DecisionCard | null {
+  if (state.pendingPatch?.status === "needs_confirmation") {
+    const options = getLatestSchoolListOptions(state);
+
+    if (options.length === 0) {
+      return {
+        type: "yes_no",
+        prompt: "Is this your current shortlist?",
+        reason:
+          "I found school-list signals in your latest material, but I need a simple confirmation before I write them into your profile.",
+        options: [
+          {
+            id: "yes",
+            label: "Yes, use it",
+            description: "Confirm this school list as the working shortlist.",
+            value: "yes",
+          },
+          {
+            id: "no",
+            label: "No, not yet",
+            description: "Keep this as brainstorming and do not update the shortlist.",
+            value: "no",
+          },
+        ],
+        appliesToPatchId: state.pendingPatch.id,
+        submitLabel: "Confirm shortlist",
+      };
+    }
+
+    return {
+      type: "multi_select",
+      prompt: "Pick the schools that belong in your current shortlist.",
+      reason:
+        "I found possible school names in your latest material. Confirm the real shortlist here instead of making you explain it from scratch.",
+      options,
+      appliesToPatchId: state.pendingPatch.id,
+      submitLabel: "Confirm shortlist",
+    };
+  }
+
+  if (state.pendingPatch?.status === "conflict") {
+    const currentValue = state.profileFields.testingStatus.value;
+    const latestValue = readTestingValueFromState(state);
+
+    if (!latestValue) {
+      return null;
+    }
+
+    return {
+      type: "single_select",
+      prompt: "Which testing baseline should I trust?",
+      reason:
+        "Your latest score update conflicts with the testing baseline already in the profile, so I need one explicit choice before I update guidance.",
+      options: [
+        {
+          id: "latest",
+          label: `Use latest: ${latestValue}`,
+          description: "Replace the current testing baseline with the newest score update.",
+          value: `Use the newer ${latestValue.replace("SAT Math ", "").replace(" / RW ", " and ")} score.`,
+        },
+        {
+          id: "current",
+          label: `Keep current: ${currentValue}`,
+          description: "Ignore the new conflicting update and keep the existing baseline.",
+          value: `Keep the current ${currentValue.replace("SAT Math ", "").replace(" / RW ", " and ")} score.`,
+        },
+      ],
+      appliesToPatchId: state.pendingPatch.id,
+      submitLabel: "Apply choice",
+    };
+  }
+
+  return null;
+}
+
+export function deriveSuggestedReplies(state: DemoState): SuggestedReply[] {
+  if (state.pendingPatch) {
+    return [];
+  }
+
+  if (state.materialAnalysis.length > 0) {
+    return [];
+  }
+
+  const hasOnlyOpeningTurns = state.conversation.length <= 2;
+
+  if (!hasOnlyOpeningTurns) {
+    return [];
+  }
+
+  return [
+    {
+      id: "grade",
+      label: "I'm in 11th grade",
+      message: "I'm in 11th grade and want to build a clear admissions plan.",
+    },
+    {
+      id: "school-list",
+      label: "We don't have a school list yet",
+      message: "We do not have a school list yet and need help building one.",
+    },
+    {
+      id: "test-score",
+      label: "We have a new test score",
+      message: "I have a new test score and want you to update the plan.",
+    },
+    {
+      id: "affordability",
+      label: "We're worried about affordability",
+      message: "I'm worried about affordability and want the plan to reflect budget reality.",
+    },
+  ];
 }
 
 export function applySchoolListBuckets(
@@ -785,9 +923,30 @@ function parseSatScore(content: string): { math: string; readingWriting: string 
 function parseSchoolList(content: string): string[] {
   return content
     .split(/,|\n/)
-    .map((item) => item.trim().replace(/^and\s+/i, ""))
+    .map((item) =>
+      item
+        .trim()
+        .replace(/^and\s+/i, "")
+        .replace(/^(maybe\s+)?(some\s+options\s+are|options\s+are|thinking\s+about|considering)\s+/i, "")
+        .replace(/^a\s+few\s+/i, "")
+        .trim(),
+    )
     .filter((item) => item.length > 0)
     .slice(0, 5);
+}
+
+function getLatestSchoolListOptions(state: DemoState): DecisionCardOption[] {
+  const extractedSchools =
+    state.materialAnalysis[0]?.extractedFacts.length
+      ? state.materialAnalysis[0].extractedFacts
+      : parseSchoolList(state.materials[0]?.content ?? "");
+
+  return extractedSchools.map((school, index) => ({
+    id: `school-${index + 1}`,
+    label: school,
+    description: "Include this school in the current working shortlist.",
+    value: school,
+  }));
 }
 
 function summarizeActivityUpdate(content: string): string | null {

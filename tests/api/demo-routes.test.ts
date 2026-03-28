@@ -28,6 +28,11 @@ describe("demo api routes", () => {
               status: string;
             };
           };
+          decisionCard: unknown;
+          suggestedReplies: Array<{
+            label: string;
+            message: string;
+          }>;
         };
         capabilities: {
           materialTypes: string[];
@@ -46,6 +51,9 @@ describe("demo api routes", () => {
     expect(json.data.state.studentProfile.firstName).toBe("Demo Student");
     expect(json.data.state.studentProfile.gradeLevel).toBe("11th grade");
     expect(json.data.state.profileFields.testingStatus.status).toBe("unconfirmed");
+    expect(json.data.state.decisionCard).toBeNull();
+    expect(json.data.state.suggestedReplies.length).toBeGreaterThan(0);
+    expect(json.data.state.suggestedReplies.map((reply) => reply.label)).toContain("I'm in 11th grade");
     expect(json.data.capabilities.materialTypes).toContain("test_score");
     expect(json.data.capabilities.conversationGoals).toContain("clarify_profile");
     expect(json.data.deployment.persistenceKind).toBe("memory");
@@ -228,6 +236,8 @@ describe("demo api routes", () => {
               status: string;
             };
           };
+          decisionCard: unknown;
+          suggestedReplies: Array<unknown>;
         };
       };
     };
@@ -246,6 +256,8 @@ describe("demo api routes", () => {
     expect(json.data.weeklyBrief.whatChanged).toContain("SAT");
     expect(json.data.state.profileFields.testingStatus.value).toContain("760");
     expect(json.data.state.profileFields.testingStatus.status).toBe("known");
+    expect(json.data.state.decisionCard).toBeNull();
+    expect(json.data.state.suggestedReplies).toHaveLength(0);
   });
 
   it("returns needs confirmation for an ambiguous school list submission", async () => {
@@ -279,6 +291,10 @@ describe("demo api routes", () => {
           pendingPatch: {
             status: string;
           } | null;
+          decisionCard: {
+            type: string;
+            options: Array<{ label: string }>;
+          } | null;
           profileFields: {
             schoolList: {
               status: string;
@@ -294,6 +310,8 @@ describe("demo api routes", () => {
     expect(json.data.materialAnalysis?.patchStatus).toBe("needs_confirmation");
     expect(json.data.materialAnalysis?.affectedFields).toContain("schoolList");
     expect(json.data.state.pendingPatch?.status).toBe("needs_confirmation");
+    expect(json.data.state.decisionCard?.type).toBe("multi_select");
+    expect(json.data.state.decisionCard?.options.map((option) => option.label)).toContain("Purdue");
     expect(json.data.state.profileFields.schoolList.status).not.toBe("known");
   });
 
@@ -455,17 +473,17 @@ describe("demo api routes", () => {
     expect(json.data.reply.goal).toBe("deliver_brief");
     expect(json.data.reply.missingProfileFields).toContain("testingStatus");
     expect(json.data.reply.nextPromptType).toBe("deliver_initial_guidance");
-    expect(json.data.reply.content).toMatch(/current understanding/i);
-    expect(json.data.reply.content).toMatch(/top priority/i);
+    expect(json.data.reply.content).toMatch(/here's where i think things stand/i);
+    expect(json.data.reply.content).toMatch(/what i'd focus on this month/i);
     expect(json.data.reply.content).toMatch(/SAT|ACT|school list/i);
     expect(json.data.state.profileFields.currentFocus.value).toMatch(/testing|school list|priority/i);
     expect(json.data.state.weeklyBrief.whatChanged).toMatch(/starter understanding|clearer starter/i);
     expect(json.data.state.weeklyBrief.whatMatters).toMatch(/testing|school list/i);
     expect(json.data.state.weeklyBrief.topActions.join(" ")).toMatch(/SAT|ACT|school list/i);
-    expect(json.data.state.conversation[0]).toMatch(/Welcome back/i);
-    expect(json.data.state.conversation[1]).toMatch(/Guided interview/i);
+    expect(json.data.state.conversation[0]).toMatch(/school list|testing/i);
+    expect(json.data.state.conversation[1]).toMatch(/grade|school list/i);
     expect(json.data.state.conversation.at(-2)).toMatch(/Family:/);
-    expect(json.data.state.conversation.at(-1)).toMatch(/Current understanding:/i);
+    expect(json.data.state.conversation.at(-1)).toMatch(/Here's where I think things stand:/i);
   });
 
   it("persists conversation updates across demo route calls", async () => {
@@ -490,8 +508,8 @@ describe("demo api routes", () => {
       };
     };
 
-    expect(json.data.state.conversation[0]).toMatch(/Welcome back/i);
-    expect(json.data.state.conversation[1]).toMatch(/Guided interview/i);
+    expect(json.data.state.conversation[0]).toMatch(/school list|testing/i);
+    expect(json.data.state.conversation[1]).toMatch(/grade|school list/i);
     expect(json.data.state.conversation.at(-2)).toMatch(/Family:/);
     expect(json.data.state.conversation.at(-1)).toMatch(/Coach:/);
   });

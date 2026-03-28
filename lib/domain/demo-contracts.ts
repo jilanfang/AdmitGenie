@@ -160,7 +160,7 @@ function buildCoachReply(
     return {
       goal: "confirm_patch",
       content:
-        "Before I move on, I need to confirm the school list signal I just found. Is that actually your current shortlist, or was it just an early brainstorm?",
+        "Before I guide you to the next step, I need to check one thing: is this really your current shortlist, or was it just an early brainstorm?",
       missingProfileFields,
       nextPromptType: "confirm_school_list",
     };
@@ -170,7 +170,7 @@ function buildCoachReply(
     return {
       goal: "resolve_conflict",
       content:
-        "I still need you to resolve the conflicting testing update before I tighten the advice. Which score should I trust for your current profile?",
+        "I need you to settle the testing conflict before I tighten the plan. Which score should I trust as your current baseline?",
       missingProfileFields,
       nextPromptType: "resolve_testing_conflict",
     };
@@ -184,7 +184,7 @@ function buildCoachReply(
     return {
       goal: "follow_up_action",
       content:
-        "Now that testing is stronger, the next execution step is your school list. Start by sorting schools into reach, target, and safer-fit buckets so I can turn this into sharper next-step guidance.",
+        "Now that the testing picture is clearer, the next move is your school list. Start by sorting schools into reach, target, and safer-fit buckets so I can turn this into a real strategy.",
       missingProfileFields,
       nextPromptType: "advance_school_list",
     };
@@ -194,7 +194,7 @@ function buildCoachReply(
     return {
       goal: "clarify_profile",
       content:
-        "I heard that you do not have a school list yet. The next highest-value detail is your testing status, because that changes how I frame selective targets, timing, and what belongs in reach versus target buckets.",
+        "If you do not have a school list yet, that is fine. The next highest-value detail is your testing status, because it changes how aggressive the list should be and how I frame timing.",
       missingProfileFields,
       nextPromptType: "ask_testing_status",
     };
@@ -204,7 +204,7 @@ function buildCoachReply(
     return {
       goal: "clarify_profile",
       content:
-        "That gives me more context on testing. I still want to pin down the school list and target range so the coach can turn your current profile into sharper admissions priorities.",
+        "That helps on testing. Now I want to pin down the school list and target range so I can turn your current profile into sharper priorities.",
       missingProfileFields,
       nextPromptType: "ask_school_list",
     };
@@ -214,7 +214,7 @@ function buildCoachReply(
     return {
       goal: "clarify_profile",
       content:
-        "I can work with that starting point. The next two gaps are your school list and testing status, because those two fields most directly change the first useful brief and the coach's reach-versus-fit guidance.",
+        "I can work with that starting point. The next two gaps are still your school list and testing status, because those are the two details that most directly change what I recommend next.",
       missingProfileFields,
       nextPromptType: "ask_testing_status",
     };
@@ -228,7 +228,7 @@ function buildCoachReply(
     return {
       goal: "follow_up_action",
       content:
-        "Now that the list is bucketed, the next move is timing. Tell me which schools are early action, early decision, or regular decision so I can turn the plan into deadline-aware priorities.",
+        "Now that the list is bucketed, the next move is timing. Tell me which schools are early action, early decision, or regular decision so I can map this into deadline-aware priorities.",
       missingProfileFields,
       nextPromptType: "clarify_deadline_strategy",
     };
@@ -237,7 +237,7 @@ function buildCoachReply(
   return {
     goal: "clarify_profile",
     content:
-      "I have enough to keep going, but I still need one sharper profile signal before the advice gets specific. Tell me your current testing status or share the first draft of your school list so I can tighten the next brief.",
+      "I have enough to keep going, but I still need one sharper signal before the advice gets specific. Tell me your current testing status or share the first draft of your school list so I can tighten the plan.",
     missingProfileFields,
     nextPromptType: "ask_profile_signal",
   };
@@ -255,7 +255,7 @@ function advanceConversationState(
       reply: {
         goal: "confirm_patch",
         content:
-          "Confirmed. I updated your school list and will use it as the working shortlist. The next move is to sort it into reach, target, and safer-fit buckets so the guidance gets more concrete.",
+          "Confirmed. I updated your school list and will use it as the working shortlist. The next move is to sort it into reach, target, and safer-fit buckets so I can make the guidance more concrete.",
         missingProfileFields: getMissingProfileFields(nextState),
         nextPromptType: "advance_school_list",
       },
@@ -324,10 +324,10 @@ function advanceConversationState(
       reply: {
         goal: "deliver_brief",
         content: [
-          "Current understanding: you are working from an ambitious early profile, but your testing baseline and school list are still not locked." +
+          "Here's where I think things stand: you are working from an ambitious early profile, but your testing baseline and school list are still not locked." +
             concernSummary,
-          "Top priority this month: reduce uncertainty in testing and school-list strategy so the coach can turn broad ambition into a real admissions plan.",
-          "What would sharpen the advice next: your latest SAT / ACT status and the first 6-10 schools you are seriously considering.",
+          "What I'd focus on this month: reduce uncertainty in testing and school-list strategy so the coach can turn broad ambition into a real admissions plan.",
+          "What would help me guide you better next: your latest SAT / ACT status and the first 6-10 schools you are seriously considering.",
           nextPromptType === "ask_testing_status"
             ? "Start with your current SAT / ACT status so I can tighten the first recommendation."
             : nextPromptType === "ask_school_list"
@@ -627,7 +627,7 @@ function shouldDeliverInitialGuidance(
     return false;
   }
 
-  if (state.conversation.some((entry) => /Current understanding:/i.test(entry))) {
+  if (state.conversation.some((entry) => /Here's where I think things stand:/i.test(entry))) {
     return false;
   }
 

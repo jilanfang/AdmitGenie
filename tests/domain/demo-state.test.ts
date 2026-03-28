@@ -1,5 +1,7 @@
 import {
   createInitialDemoState,
+  deriveDecisionCard,
+  deriveSuggestedReplies,
   submitMaterialDraft,
 } from "@/lib/domain/demo-state";
 import { continueDemoConversation } from "@/lib/domain/demo-contracts";
@@ -8,11 +10,13 @@ describe("demo-state", () => {
   it("starts with a coach-led brief and missing information markers", () => {
     const state = createInitialDemoState();
 
-    expect(state.conversation[0]).toMatch(/Welcome back/i);
-    expect(state.conversation[1]).toMatch(/Guided interview/i);
+    expect(state.conversation[0]).toMatch(/light starting point/i);
+    expect(state.conversation[1]).toMatch(/Let's make this simple/i);
     expect(state.weeklyBrief.whatMatters).toContain("school list");
     expect(state.profileFields.testingStatus.status).toBe("unconfirmed");
     expect(state.profileFields.schoolList.status).toBe("unconfirmed");
+    expect(deriveSuggestedReplies(state).map((reply) => reply.label)).toContain("I'm in 11th grade");
+    expect(deriveSuggestedReplies(state).map((reply) => reply.label)).toContain("We don't have a school list yet");
   });
 
   it("updates profile state and brief when a new SAT material is added", () => {
@@ -33,6 +37,7 @@ describe("demo-state", () => {
     expect(updated.materialAnalysis[0]?.patchStatus).toBe("applied");
     expect(updated.materialAnalysis[0]?.affectedFields).toContain("testingStatus");
     expect(updated.pendingPatch).toBeNull();
+    expect(deriveSuggestedReplies(updated)).toHaveLength(0);
   });
 
   it("marks an ambiguous school list as needs confirmation", () => {
@@ -48,6 +53,8 @@ describe("demo-state", () => {
     expect(updated.materialAnalysis[0]?.affectedFields).toContain("schoolList");
     expect(updated.pendingPatch?.status).toBe("needs_confirmation");
     expect(updated.profileFields.schoolList.status).toBe("unconfirmed");
+    expect(deriveDecisionCard(updated)?.type).toBe("multi_select");
+    expect(deriveDecisionCard(updated)?.options.map((option) => option.label)).toContain("Purdue");
   });
 
   it("marks conflicting testing updates without silently overwriting known testing state", () => {
@@ -67,6 +74,7 @@ describe("demo-state", () => {
     expect(updated.pendingPatch?.status).toBe("conflict");
     expect(updated.profileFields.testingStatus.value).toContain("760");
     expect(updated.profileFields.testingStatus.status).toBe("known");
+    expect(deriveDecisionCard(updated)?.type).toBe("single_select");
   });
 
   it("appends new family and coach turns after the opening transcript", () => {
@@ -77,8 +85,8 @@ describe("demo-state", () => {
       message: "We want selective engineering programs but do not have a school list yet.",
     });
 
-    expect(updated.state.conversation[0]).toMatch(/Welcome back/i);
-    expect(updated.state.conversation[1]).toMatch(/Guided interview/i);
+    expect(updated.state.conversation[0]).toMatch(/light starting point/i);
+    expect(updated.state.conversation[1]).toMatch(/Let's make this simple/i);
     expect(updated.state.conversation.at(-2)).toMatch(/^Family:/);
     expect(updated.state.conversation.at(-1)).toMatch(/^Coach:/);
   });
@@ -94,15 +102,15 @@ describe("demo-state", () => {
 
     expect(updated.reply.goal).toBe("deliver_brief");
     expect(updated.reply.nextPromptType).toBe("deliver_initial_guidance");
-    expect(updated.reply.content).toMatch(/current understanding/i);
-    expect(updated.reply.content).toMatch(/top priority/i);
-    expect(updated.reply.content).toMatch(/sharpen the advice/i);
+    expect(updated.reply.content).toMatch(/here's where i think things stand/i);
+    expect(updated.reply.content).toMatch(/what i'd focus on this month/i);
+    expect(updated.reply.content).toMatch(/help me guide you better next/i);
     expect(updated.reply.content).toMatch(/SAT|ACT|school list/i);
     expect(updated.state.profileFields.currentFocus.value).toMatch(/testing|school list|priority/i);
     expect(updated.state.weeklyBrief.whatChanged).toMatch(/starter understanding|clearer starting point/i);
     expect(updated.state.weeklyBrief.whatMatters).toMatch(/testing|school list/i);
     expect(updated.state.weeklyBrief.topActions.join(" ")).toMatch(/SAT|ACT|school list/i);
-    expect(updated.state.conversation.at(-1)).toMatch(/current understanding/i);
+    expect(updated.state.conversation.at(-1)).toMatch(/here's where i think things stand/i);
   });
 
   it("prioritizes patch confirmation over generic profile clarification when a pending patch exists", () => {

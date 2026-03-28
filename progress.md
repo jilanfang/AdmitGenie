@@ -1,74 +1,68 @@
 <!-- task-archive metadata -->
-<!-- snapshot_id: 20260323-221748-admitgenie-slice3-conversation-loops -->
+<!-- snapshot_id: 20260328-003556-admitgenie-ai-native-desktop-ui-checkpoint -->
 <!-- project_path: /Users/jilanfang/ai college-apply-helper -->
-<!-- saved_at: 2026-03-23 22:17 CST -->
+<!-- saved_at: 2026-03-28 00:35 CST -->
 
 # Progress Log
 
 ## Checkpoint Summary
-- Snapshot ID: 20260323-221748-admitgenie-slice3-conversation-loops
-- Saved At: 2026-03-23 22:17 CST
+- Snapshot ID: 20260328-003556-admitgenie-ai-native-desktop-ui-checkpoint
+- Saved At: 2026-03-28 00:35 CST
 - Project Path: /Users/jilanfang/ai college-apply-helper
-- Current Phase: first-run onboarding is now closed, and Slice 3 extends from shortlist/timing into story/material priority, execution progress, blocker resolution, and ready-to-ship guidance.
+- Current Phase: checkpoint after multiple rounds of AI-native UI convergence, desktop-first browser QA, and final polishing of the Mac/PC web experience.
 
 ## Actions Completed
-- Kept the shell chat-first with left sidebar, center chat, and thin notebook rail.
-- Shipped visible material analysis and patch-state UX.
-- Shipped brief expansion and priority summary UX.
-- Added rule-driven coach orchestration based on current profile and pending patch state.
-- Added a first-run onboarding checkpoint with early understanding, one top priority, and one next-best missing input.
-- Added conversation-based school-list confirmation.
-- Added conversation-based testing-conflict resolution.
-- Added conversation-based school bucket classification from a confirmed shortlist.
-- Added conversation-based application timing capture after shortlist bucketing.
-- Added conversation-based story/material priority, execution progress, blocker resolution, and ready-to-ship follow-ups.
-- Added a visible `Application timing` field to the notebook state.
-- Added a demo access gate and workspace-scoped state so the demo can be shared more safely without full auth.
-- Wrote a deadline-loop spec and implementation plan under `docs/superpowers`.
-- Wrote an onboarding-closure spec and implementation plan under `docs/superpowers`.
-- Wrote a Chinese founder alignment questionnaire tailored for a non-technical/non-product partner.
+- Converged the main UI toward a much more AI-native, conversation-first shell.
+- Moved low-frequency controls behind a hidden side panel and kept confirmation inside chat via cards.
+- Rewrote access gate and coach copy to sound more like a private admissions counselor.
+- Weakened heavy UI framing across composer, suggestions, user messages, inserts, and decision surfaces.
+- Tuned the desktop/Mac web feel with calmer spacing, better interaction states, and improved side-panel layering.
+- Ran real browser QA on `http://127.0.0.1:3101` and used the screenshots to correct live visual issues.
+- Verified the current workspace with fresh `pnpm test` and `pnpm build`.
 
 ## Next Actions
-- Continue Slice 3 from `ready-to-ship` into the next concrete execution loop, with `testing policy` or a more calendarized execution plan as the best candidates.
-- Keep momentum on user-visible flows rather than architecture layers.
-- Keep checkpoint docs and product docs aligned in the same pass as behavior changes.
-- Use the refreshed demo script when the goal is partner or stakeholder communication rather than product-depth work.
+- Review the current desktop UI in browser and decide whether any more polish is worth doing.
+- If continuing UI work, focus only on first-screen rhythm, composer weight on laptop screens, and side-panel density.
+- Before shipping or handing off, decide how to split or commit the broader modified file set.
+- Keep the simplified chat-first interaction principle as the source of truth for any future UI changes.
 
 ## Files Created/Modified
+- app/globals.css
 - components/coach-shell.tsx
 - components/demo-access-gate.tsx
-- app/page.tsx
-- app/api/demo/access/route.ts
-- app/api/demo/logout/route.ts
-- lib/domain/demo-contracts.ts
-- lib/domain/demo-state.ts
-- lib/domain/personas.ts
-- lib/server/persistence.ts
-- lib/server/demo-access.ts
-- tests/domain/demo-state.test.ts
-- tests/api/demo-routes.test.ts
 - tests/components/coach-shell.test.tsx
 - tests/app/home-page.test.tsx
-- tests/auth/demo-access.test.ts
-- docs/superpowers/specs/2026-03-24-deadline-loop-design.md
-- docs/superpowers/plans/2026-03-24-deadline-loop-plan.md
-- docs/superpowers/specs/2026-03-25-onboarding-closure-design.md
-- docs/superpowers/plans/2026-03-25-onboarding-closure-plan.md
-- docs/product/founder-alignment-checklist-zh.md
+- docs/product/onboarding-v1.md
+- docs/product/user-workflows.md
+- docs/product/canonical-product-blueprint-zh.md
+- docs/product/founder-priority-user-journeys-zh.md
+- lib/domain/demo-contracts.ts
+- lib/domain/demo-state.ts
+- lib/server/persistence.ts
+- tests/api/demo-routes.test.ts
+- tests/domain/demo-state.test.ts
+- AGENTS.md
+- .gitignore
+- app/icon.svg
+- task_plan.md
+- progress.md
+- findings.md
 - .task-archive/current.md
-- .task-archive/snapshots/20260323-221748-admitgenie-slice3-conversation-loops.md
+- .task-archive/snapshots/20260328-003556-admitgenie-ai-native-desktop-ui-checkpoint.md
 
 ## Verification Results
 | Check | Status | Details |
 |-------|--------|---------|
-| `pnpm test` | passed | 82/82 tests passed after onboarding closure, workspace isolation, and shared demo access updates. |
-| `pnpm build` | passed | Local production build succeeded with the expanded shared-demo and conversation flows in place. |
+| `pnpm test` | passed | 84/84 tests passed on the current workspace on 2026-03-28. |
+| `pnpm build` | passed | Production build succeeded with `next build --webpack` on 2026-03-28. |
+| Local browser QA | passed | Verified desktop access gate, main chat view, and side panel using Playwright against `http://127.0.0.1:3101`. |
+| Desktop visual polish | passed | Final browser review confirmed improved opening rhythm, calmer side-panel layering, and cleaner local demo presentation. |
 
 ## Reboot Check
 | Question | Answer |
 |----------|--------|
-| Where am I? | At a checkpoint where first-run onboarding is closed and the coach can now move from onboarding into shortlist, timing, execution progress, and ready-to-ship guidance. |
-| Where am I going? | Toward the next execution-oriented loop after ready-to-ship guidance, likely testing policy or calendarized execution. |
-| What's the goal? | A demoable AI-native admissions coach MVP with real closed-loop behavior. |
-| What have I learned? | The strongest progress comes from concrete, user-visible loops: onboarding value, material analysis, confirmation, resolution, timing, and execution follow-through. |
-| What have I done? | Shipped onboarding closure, Material loop, Brief loop, deeper Conversation loop behaviors, shared demo access/workspace support, and the partner alignment questionnaire. |
+| Where am I? | At a browser-verified checkpoint after multiple rounds of AI-native desktop UI convergence and Mac/PC polish. |
+| Where am I going? | Either toward a very small final desktop polish pass or back into product/implementation work on top of the stabilized interaction model. |
+| What's the goal? | Keep AdmitGenie feeling like a private admissions counselor conversation instead of a multi-panel system. |
+| What have I learned? | The last 10% of this UI work came from real browser QA: desktop spacing, opening rhythm, side-panel layering, and dev-only local noise mattered more than more features. |
+| What have I done? | Simplified the shell, tightened the copy, improved the desktop interaction feel, validated it in browser, and re-ran tests/build. |

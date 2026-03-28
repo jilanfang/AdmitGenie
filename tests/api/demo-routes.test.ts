@@ -239,6 +239,14 @@ describe("demo api routes", () => {
           decisionCard: unknown;
           suggestedReplies: Array<unknown>;
         };
+        routing: {
+          responseMode: string;
+          writeExecuted: boolean;
+          classification: {
+            inputKind: string;
+          };
+          fallbackReason?: string | null;
+        };
       };
     };
 
@@ -258,6 +266,9 @@ describe("demo api routes", () => {
     expect(json.data.state.profileFields.testingStatus.status).toBe("known");
     expect(json.data.state.decisionCard).toBeNull();
     expect(json.data.state.suggestedReplies).toHaveLength(0);
+    expect(json.data.routing.classification.inputKind).toBeDefined();
+    expect(json.data.routing.responseMode).toBeDefined();
+    expect(typeof json.data.routing.writeExecuted).toBe("boolean");
   });
 
   it("returns needs confirmation for an ambiguous school list submission", async () => {

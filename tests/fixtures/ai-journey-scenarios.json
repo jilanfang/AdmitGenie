@@ -1,0 +1,587 @@
+[
+  {
+    "id": "starter-guidance-strategic",
+    "journey": "Journey 1",
+    "persona": "Strategic STEM Striver",
+    "personaSlug": "strategic-stem-striver",
+    "steps": [
+      {
+        "label": "starter guidance",
+        "channel": "chat",
+        "message": "I'm in 11th grade and aiming for selective engineering programs, but we do not have a school list yet and testing is still unclear.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedReplyIncludes": [
+          "here's where i think things stand",
+          "school list"
+        ],
+        "expectedField": "currentFocus",
+        "expectedFieldStatus": "inferred",
+        "expectedFieldValueIncludes": [
+          "testing",
+          "school list"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "sat-update-follow-up-first-gen",
+    "journey": "Journey 3",
+    "persona": "First-Gen Ambition Builder",
+    "personaSlug": "first-gen-ambition-builder",
+    "steps": [
+      {
+        "label": "sat material update",
+        "channel": "material",
+        "draft": {
+          "type": "test_score",
+          "title": "March SAT",
+          "content": "New SAT update: Math 760, Reading and Writing 730."
+        },
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedPatchStatus": "applied",
+        "expectedField": "testingStatus",
+        "expectedFieldStatus": "known",
+        "expectedFieldValueIncludes": [
+          "760",
+          "730"
+        ],
+        "expectedBriefIncludes": [
+          "SAT"
+        ]
+      },
+      {
+        "label": "ask next step",
+        "channel": "chat",
+        "message": "Thanks, what should we do next now?",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedReplyIncludes": [
+          "school list"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "shortlist-confirmation-strategic",
+    "journey": "Journey 4",
+    "persona": "Strategic STEM Striver",
+    "personaSlug": "strategic-stem-striver",
+    "steps": [
+      {
+        "label": "ambiguous shortlist material",
+        "channel": "material",
+        "draft": {
+          "type": "school_list",
+          "title": "Maybe schools",
+          "content": "Maybe some options are Purdue, Georgia Tech, UT Austin, and a few UC schools."
+        },
+        "expectedResponseMode": "multi_select",
+        "expectedWriteExecuted": true,
+        "expectedDecisionCardType": "multi_select",
+        "expectedPendingPatchStatus": "needs_confirmation",
+        "expectedPatchStatus": "needs_confirmation",
+        "expectedField": "schoolList",
+        "expectedFieldStatus": "unconfirmed"
+      },
+      {
+        "label": "confirm shortlist in chat",
+        "channel": "chat",
+        "message": "Yes, that is our current shortlist. Please use Purdue, Georgia Tech, and UT Austin.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedDecisionCardType": null,
+        "expectedPendingPatchStatus": null,
+        "expectedField": "schoolList",
+        "expectedFieldStatus": "known",
+        "expectedFieldValueIncludes": [
+          "Purdue",
+          "Georgia Tech",
+          "UT Austin"
+        ],
+        "expectedBriefIncludes": [
+          "school list"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "testing-conflict-balanced-premed",
+    "journey": "Journey 5",
+    "persona": "Balanced Pre-Med Planner",
+    "personaSlug": "balanced-premed-planner",
+    "steps": [
+      {
+        "label": "baseline score",
+        "channel": "material",
+        "draft": {
+          "type": "test_score",
+          "title": "March SAT",
+          "content": "New SAT update: Math 760, Reading and Writing 730."
+        },
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedPatchStatus": "applied",
+        "expectedField": "testingStatus",
+        "expectedFieldStatus": "known",
+        "expectedFieldValueIncludes": [
+          "760"
+        ]
+      },
+      {
+        "label": "conflicting score",
+        "channel": "material",
+        "draft": {
+          "type": "test_score",
+          "title": "Conflicting SAT",
+          "content": "Updated SAT update: Math 700, Reading and Writing 680."
+        },
+        "expectedResponseMode": "single_select",
+        "expectedWriteExecuted": true,
+        "expectedDecisionCardType": "single_select",
+        "expectedPendingPatchStatus": "conflict",
+        "expectedPatchStatus": "conflict",
+        "expectedField": "testingStatus",
+        "expectedFieldStatus": "known",
+        "expectedFieldValueIncludes": [
+          "760"
+        ]
+      },
+      {
+        "label": "resolve score conflict",
+        "channel": "chat",
+        "message": "Use the newer 700 and 680 score.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedDecisionCardType": null,
+        "expectedPendingPatchStatus": null,
+        "expectedField": "testingStatus",
+        "expectedFieldStatus": "known",
+        "expectedFieldValueIncludes": [
+          "700",
+          "680"
+        ],
+        "expectedBriefIncludes": [
+          "testing"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "shortlist-to-buckets-strategic",
+    "journey": "Journey 6",
+    "persona": "Strategic STEM Striver",
+    "personaSlug": "strategic-stem-striver",
+    "steps": [
+      {
+        "label": "ambiguous shortlist material",
+        "channel": "material",
+        "draft": {
+          "type": "school_list",
+          "title": "Maybe schools",
+          "content": "Maybe some options are Purdue, Georgia Tech, UT Austin, and a few UC schools."
+        },
+        "expectedResponseMode": "multi_select",
+        "expectedWriteExecuted": true,
+        "expectedDecisionCardType": "multi_select",
+        "expectedPendingPatchStatus": "needs_confirmation",
+        "expectedPatchStatus": "needs_confirmation"
+      },
+      {
+        "label": "confirm shortlist",
+        "channel": "chat",
+        "message": "Yes, that is our current shortlist. Please use Purdue, Georgia Tech, and UT Austin.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedPendingPatchStatus": null,
+        "expectedField": "schoolList",
+        "expectedFieldStatus": "known",
+        "expectedFieldValueIncludes": [
+          "Purdue",
+          "Georgia Tech",
+          "UT Austin"
+        ]
+      },
+      {
+        "label": "apply buckets",
+        "channel": "chat",
+        "message": "Purdue and Georgia Tech are reach schools for us. UT Austin is target.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedReplyIncludes": [
+          "bucket",
+          "reach",
+          "target"
+        ],
+        "expectedField": "schoolList",
+        "expectedFieldStatus": "known",
+        "expectedFieldValueIncludes": [
+          "Reach:",
+          "Target:"
+        ],
+        "expectedBriefIncludes": [
+          "bucket"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "buckets-to-timing-balanced-premed",
+    "journey": "Journey 7",
+    "persona": "Balanced Pre-Med Planner",
+    "personaSlug": "balanced-premed-planner",
+    "steps": [
+      {
+        "label": "ambiguous shortlist material",
+        "channel": "material",
+        "draft": {
+          "type": "school_list",
+          "title": "Maybe schools",
+          "content": "Maybe some options are Purdue, Georgia Tech, UT Austin, and a few UC schools."
+        },
+        "expectedResponseMode": "multi_select",
+        "expectedWriteExecuted": true,
+        "expectedDecisionCardType": "multi_select",
+        "expectedPendingPatchStatus": "needs_confirmation"
+      },
+      {
+        "label": "confirm shortlist",
+        "channel": "chat",
+        "message": "Yes, that is our current shortlist. Please use Purdue, Georgia Tech, and UT Austin.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply buckets",
+        "channel": "chat",
+        "message": "Purdue and Georgia Tech are reach schools for us. UT Austin is target.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedField": "schoolList",
+        "expectedFieldStatus": "known",
+        "expectedFieldValueIncludes": [
+          "Reach:",
+          "Target:"
+        ]
+      },
+      {
+        "label": "apply timing",
+        "channel": "chat",
+        "message": "Purdue and Georgia Tech are early action for us. UT Austin is regular decision, and we do not want binding early decision.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedReplyIncludes": [
+          "timing",
+          "early",
+          "regular"
+        ],
+        "expectedField": "applicationTiming",
+        "expectedFieldStatus": "known",
+        "expectedFieldValueIncludes": [
+          "Early:",
+          "Regular:"
+        ],
+        "expectedBriefIncludes": [
+          "deadline",
+          "early",
+          "regular"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "timing-to-priority-story-rich",
+    "journey": "Journey 8",
+    "persona": "Story-Rich Humanities Builder",
+    "personaSlug": "story-rich-humanities-builder",
+    "steps": [
+      {
+        "label": "ambiguous shortlist material",
+        "channel": "material",
+        "draft": {
+          "type": "school_list",
+          "title": "Maybe schools",
+          "content": "Maybe some options are Purdue, Georgia Tech, UT Austin, and a few UC schools."
+        },
+        "expectedResponseMode": "multi_select",
+        "expectedWriteExecuted": true,
+        "expectedDecisionCardType": "multi_select",
+        "expectedPendingPatchStatus": "needs_confirmation"
+      },
+      {
+        "label": "confirm shortlist",
+        "channel": "chat",
+        "message": "Yes, that is our current shortlist. Please use Purdue, Georgia Tech, and UT Austin.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply buckets",
+        "channel": "chat",
+        "message": "Purdue and Georgia Tech are reach schools for us. UT Austin is target.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply timing",
+        "channel": "chat",
+        "message": "Purdue and Georgia Tech are early action for us. UT Austin is regular decision, and we do not want binding early decision.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply material priority",
+        "channel": "chat",
+        "message": "For Purdue and Georgia Tech, our top material priority is leadership and STEM project stories first. UT Austin can wait until after early rounds.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedReplyIncludes": [
+          "story",
+          "material",
+          "priority"
+        ],
+        "expectedField": "currentFocus",
+        "expectedFieldStatus": "inferred",
+        "expectedFieldValueIncludes": [
+          "Prioritize the highest-leverage stories"
+        ],
+        "expectedBriefIncludes": [
+          "priority",
+          "material"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "priority-to-progress-strategic",
+    "journey": "Journey 9",
+    "persona": "Strategic STEM Striver",
+    "personaSlug": "strategic-stem-striver",
+    "steps": [
+      {
+        "label": "ambiguous shortlist material",
+        "channel": "material",
+        "draft": {
+          "type": "school_list",
+          "title": "Maybe schools",
+          "content": "Maybe some options are Purdue, Georgia Tech, UT Austin, and a few UC schools."
+        },
+        "expectedResponseMode": "multi_select",
+        "expectedWriteExecuted": true,
+        "expectedDecisionCardType": "multi_select",
+        "expectedPendingPatchStatus": "needs_confirmation"
+      },
+      {
+        "label": "confirm shortlist",
+        "channel": "chat",
+        "message": "Yes, that is our current shortlist. Please use Purdue, Georgia Tech, and UT Austin.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply buckets",
+        "channel": "chat",
+        "message": "Purdue and Georgia Tech are reach schools for us. UT Austin is target.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply timing",
+        "channel": "chat",
+        "message": "Purdue and Georgia Tech are early action for us. UT Austin is regular decision, and we do not want binding early decision.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply material priority",
+        "channel": "chat",
+        "message": "For Purdue and Georgia Tech, our top material priority is leadership and STEM project stories first. UT Austin can wait until after early rounds.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply execution progress",
+        "channel": "chat",
+        "message": "We drafted the Purdue leadership story and collected robotics evidence for Georgia Tech this week.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedReplyIncludes": [
+          "draft",
+          "evidence",
+          "execution"
+        ],
+        "expectedField": "currentFocus",
+        "expectedFieldStatus": "inferred",
+        "expectedFieldValueIncludes": [
+          "Execution is underway"
+        ],
+        "expectedBriefIncludes": [
+          "progress",
+          "execution"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "progress-to-blocker-story-rich",
+    "journey": "Journey 9",
+    "persona": "Story-Rich Humanities Builder",
+    "personaSlug": "story-rich-humanities-builder",
+    "steps": [
+      {
+        "label": "ambiguous shortlist material",
+        "channel": "material",
+        "draft": {
+          "type": "school_list",
+          "title": "Maybe schools",
+          "content": "Maybe some options are Purdue, Georgia Tech, UT Austin, and a few UC schools."
+        },
+        "expectedResponseMode": "multi_select",
+        "expectedWriteExecuted": true,
+        "expectedDecisionCardType": "multi_select",
+        "expectedPendingPatchStatus": "needs_confirmation"
+      },
+      {
+        "label": "confirm shortlist",
+        "channel": "chat",
+        "message": "Yes, that is our current shortlist. Please use Purdue, Georgia Tech, and UT Austin.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply buckets",
+        "channel": "chat",
+        "message": "Purdue and Georgia Tech are reach schools for us. UT Austin is target.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply timing",
+        "channel": "chat",
+        "message": "Purdue and Georgia Tech are early action for us. UT Austin is regular decision, and we do not want binding early decision.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply material priority",
+        "channel": "chat",
+        "message": "For Purdue and Georgia Tech, our top material priority is leadership and STEM project stories first. UT Austin can wait until after early rounds.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply execution progress",
+        "channel": "chat",
+        "message": "We drafted the Purdue leadership story and collected robotics evidence for Georgia Tech this week.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply blocker",
+        "channel": "chat",
+        "message": "We are blocked because Purdue still needs a stronger leadership example and Georgia Tech needs clearer robotics proof.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedReplyIncludes": [
+          "blocked",
+          "leadership",
+          "robotics",
+          "proof"
+        ],
+        "expectedField": "currentFocus",
+        "expectedFieldStatus": "inferred",
+        "expectedFieldValueIncludes": [
+          "Resolve the current execution blockers"
+        ],
+        "expectedBriefIncludes": [
+          "blocker",
+          "proof"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "blocker-to-ready-trajectory",
+    "journey": "Journey 9",
+    "persona": "Trajectory Rebounder",
+    "personaSlug": "trajectory-rebounder",
+    "steps": [
+      {
+        "label": "ambiguous shortlist material",
+        "channel": "material",
+        "draft": {
+          "type": "school_list",
+          "title": "Maybe schools",
+          "content": "Maybe some options are Purdue, Georgia Tech, UT Austin, and a few UC schools."
+        },
+        "expectedResponseMode": "multi_select",
+        "expectedWriteExecuted": true,
+        "expectedDecisionCardType": "multi_select",
+        "expectedPendingPatchStatus": "needs_confirmation"
+      },
+      {
+        "label": "confirm shortlist",
+        "channel": "chat",
+        "message": "Yes, that is our current shortlist. Please use Purdue, Georgia Tech, and UT Austin.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply buckets",
+        "channel": "chat",
+        "message": "Purdue and Georgia Tech are reach schools for us. UT Austin is target.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply timing",
+        "channel": "chat",
+        "message": "Purdue and Georgia Tech are early action for us. UT Austin is regular decision, and we do not want binding early decision.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply material priority",
+        "channel": "chat",
+        "message": "For Purdue and Georgia Tech, our top material priority is leadership and STEM project stories first. UT Austin can wait until after early rounds.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply execution progress",
+        "channel": "chat",
+        "message": "We drafted the Purdue leadership story and collected robotics evidence for Georgia Tech this week.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "apply blocker",
+        "channel": "chat",
+        "message": "We are blocked because Purdue still needs a stronger leadership example and Georgia Tech needs clearer robotics proof.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true
+      },
+      {
+        "label": "resolve blocker",
+        "channel": "chat",
+        "message": "We now have the Purdue leadership example and clearer robotics proof for Georgia Tech, so those blockers are resolved.",
+        "expectedResponseMode": "chat_only",
+        "expectedWriteExecuted": true,
+        "expectedReplyIncludes": [
+          "ready",
+          "polish"
+        ],
+        "expectedField": "currentFocus",
+        "expectedFieldStatus": "inferred",
+        "expectedFieldValueIncludes": [
+          "ready for final polish"
+        ],
+        "expectedBriefIncludes": [
+          "resolved",
+          "final"
+        ]
+      }
+    ]
+  }
+]

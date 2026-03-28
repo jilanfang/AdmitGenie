@@ -9,6 +9,7 @@
     "db:push": "drizzle-kit push",
     "start": "next start",
     "test": "vitest run",
+    "test:routing-report": "vitest run tests/data/ai-routing-report.test.ts tests/api/journey-scenarios.test.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

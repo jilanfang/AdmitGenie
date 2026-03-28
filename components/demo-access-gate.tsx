@@ -1,17 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-export function DemoAccessGate() {
-  const [accessCode, setAccessCode] = useState("");
+export function DemoAccessGate(props: { initialInviteToken?: string | null }) {
+  const [accessCode, setAccessCode] = useState(props.initialInviteToken ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasAutoSubmitted = useRef(false);
 
   const handleSubmit = async () => {
     const trimmed = accessCode.trim();
 
     if (trimmed.length === 0) {
-      setError("Enter the demo access code.");
+      setError("Enter your pilot invite.");
       return;
     }
 
@@ -19,18 +20,18 @@ export function DemoAccessGate() {
     setError(null);
 
     try {
-      const response = await fetch("/api/demo/access", {
+      const response = await fetch("/api/session/access", {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          accessCode: trimmed,
+          inviteToken: trimmed,
         }),
       });
 
       if (!response.ok) {
-        setError("The demo access code is not correct.");
+        setError("That pilot invite was not recognized.");
         return;
       }
 
@@ -40,26 +41,35 @@ export function DemoAccessGate() {
     }
   };
 
+  useEffect(() => {
+    if (hasAutoSubmitted.current || !props.initialInviteToken) {
+      return;
+    }
+
+    hasAutoSubmitted.current = true;
+    void handleSubmit();
+  }, [props.initialInviteToken]);
+
   return (
     <main className="demo-access-page">
       <section className="demo-access-card">
-        <div className="demo-access-card__eyebrow">Private admissions coach</div>
-        <h1 className="demo-access-card__title">Step into the conversation.</h1>
+        <div className="demo-access-card__eyebrow">Closed pilot access</div>
+        <h1 className="demo-access-card__title">Open your active case.</h1>
         <p className="demo-access-card__body">
-          Enter the shared code and you will land directly inside the coach conversation. No setup, no dashboard tour.
+          Use your pilot invite and you will land directly inside the coach conversation for this case.
         </p>
         <p className="demo-access-card__aside">
-          One quiet thread. One coach. Start wherever the family actually is.
+          One active case. One coach thread. No dashboard tour.
         </p>
 
         <label className="demo-access-card__field">
-          <span>Shared access code</span>
+          <span>Pilot invite</span>
           <input
-            aria-label="Access code"
+            aria-label="Pilot invite"
             type="password"
             value={accessCode}
             onChange={(event) => setAccessCode(event.target.value)}
-            placeholder="Enter the shared code"
+            placeholder="Paste your pilot invite"
           />
         </label>
 
@@ -71,7 +81,7 @@ export function DemoAccessGate() {
           onClick={() => void handleSubmit()}
           disabled={isSubmitting}
         >
-          {isSubmitting ? "Entering..." : "Enter the coach"}
+          {isSubmitting ? "Opening..." : "Open the case"}
         </button>
       </section>
     </main>

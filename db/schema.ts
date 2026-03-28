@@ -1,4 +1,6 @@
 import {
+  boolean,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -77,5 +79,49 @@ export const weeklyBriefs = pgTable("weekly_briefs", {
   risksJson: jsonb("risks_json").notNull(),
   whyThisAdvice: text("why_this_advice").notNull(),
   generationReason: text("generation_reason").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const pilotCases = pgTable("pilot_cases", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  slug: varchar("slug", { length: 128 }).notNull(),
+  audience: varchar("audience", { length: 32 }).notNull(),
+  displayName: text("display_name").notNull(),
+  summary: text("summary").notNull(),
+  personaSlug: varchar("persona_slug", { length: 64 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const pilotInvites = pgTable("pilot_invites", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  caseId: varchar("case_id", { length: 64 }).notNull(),
+  label: text("label").notNull(),
+  token: varchar("token", { length: 255 }).notNull(),
+  status: varchar("status", { length: 32 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+});
+
+export const pilotSessions = pgTable("pilot_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  caseId: varchar("case_id", { length: 64 }).notNull(),
+  inviteId: uuid("invite_id"),
+  requestCount: integer("request_count").default(0).notNull(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const routingEvents = pgTable("routing_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  caseId: varchar("case_id", { length: 64 }).notNull(),
+  sessionId: uuid("session_id"),
+  routeType: varchar("route_type", { length: 32 }).notNull(),
+  inputKind: varchar("input_kind", { length: 64 }).notNull(),
+  responseMode: varchar("response_mode", { length: 32 }).notNull(),
+  writeExecuted: boolean("write_executed").notNull(),
+  fallbackReason: text("fallback_reason"),
+  errorCategory: varchar("error_category", { length: 64 }),
+  classificationJson: jsonb("classification_json"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

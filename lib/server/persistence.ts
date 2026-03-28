@@ -15,6 +15,12 @@ import {
   getDemoCapabilities,
 } from "@/lib/domain/demo-contracts";
 import {
+  routeConversationInput,
+  routeMaterialInput,
+  type RoutingMetadata,
+} from "@/lib/server/ai-routing";
+import { getPilotCaseSeed } from "@/lib/server/pilot-access";
+import {
   createInitialDemoState,
   deriveDecisionCard,
   deriveSuggestedReplies,
@@ -75,7 +81,17 @@ export type CoachStudentProfile = {
   majorDirection: string | null;
 };
 
+export type CoachCaseRecord = {
+  id: string;
+  slug: string;
+  displayName: string;
+  summary: string;
+  latestStatus: string;
+  oneNextMove: string;
+};
+
 export type CoachSnapshot = {
+  caseRecord: CoachCaseRecord;
   household: CoachHousehold;
   studentProfile: CoachStudentProfile;
   conversation: DemoState["conversation"];
@@ -103,6 +119,16 @@ export type DemoDeploymentStatus = {
   blocker: string | null;
 };
 
+export type CaseReadinessStatus = {
+  persistenceKind: PersistenceAdapter["kind"];
+  databaseReady: boolean;
+  openAiConfigured: boolean;
+  durableMode: boolean;
+  blobConfigured: boolean;
+  requestCap: number;
+  blocker: string | null;
+};
+
 export type PersistenceAdapter = {
   kind: "memory" | "drizzle";
   canSwitchPersonas: boolean;
@@ -116,12 +142,14 @@ export type PersistenceAdapter = {
       content: string;
       missingProfileFields: Array<keyof DemoState["profileFields"]>;
     };
+    routing: RoutingMetadata;
   }>;
   submitMaterial: (draft: MaterialDraft, workspace?: string) => Promise<{
     state: CoachSnapshot;
     latestPatch: DemoState["patches"][number] | null;
     materialAnalysis: DemoState["materialAnalysis"][number] | null;
     weeklyBrief: DemoState["weeklyBrief"];
+    routing: RoutingMetadata;
   }>;
 };
 
@@ -176,7 +204,11 @@ function createMemoryPersistenceAdapter(): PersistenceAdapter {
     canSwitchPersonas: true,
     async getCoachSnapshot(workspace) {
       const current = resolveWorkspaceState(workspace);
-      return snapshotFromState(current.state, current.selectedPersonaSlug);
+      return snapshotFromState(
+        current.state,
+        resolveWorkspaceKey(workspace),
+        current.selectedPersonaSlug,
+      );
     },
     getSelectedPersonaSlug(workspace) {
       return resolveWorkspaceState(workspace).selectedPersonaSlug;
@@ -185,26 +217,50 @@ function createMemoryPersistenceAdapter(): PersistenceAdapter {
       const current = resolveWorkspaceState(workspace);
       current.selectedPersonaSlug = slug;
       current.state = buildPersonaDemoState(slug);
-      return snapshotFromState(current.state, current.selectedPersonaSlug);
+      return snapshotFromState(
+        current.state,
+        resolveWorkspaceKey(workspace),
+        current.selectedPersonaSlug,
+      );
     },
     async submitConversation(message, workspace) {
       const current = resolveWorkspaceState(workspace);
-      const result = continueDemoConversation({ state: current.state, message });
+      const result = await routeConversationInput({
+        state: current.state,
+        message,
+        personaSlug: current.selectedPersonaSlug,
+        workspace,
+      });
       current.state = result.state;
       return {
-        state: snapshotFromState(result.state, current.selectedPersonaSlug),
+        state: snapshotFromState(
+          result.state,
+          resolveWorkspaceKey(workspace),
+          current.selectedPersonaSlug,
+        ),
         reply: result.reply,
+        routing: result.routing,
       };
     },
     async submitMaterial(draft, workspace) {
       const current = resolveWorkspaceState(workspace);
-      const result = applyDemoMaterial({ state: current.state, draft });
+      const result = await routeMaterialInput({
+        state: current.state,
+        draft,
+        personaSlug: current.selectedPersonaSlug,
+        workspace,
+      });
       current.state = result.state;
       return {
-        state: snapshotFromState(result.state, current.selectedPersonaSlug),
+        state: snapshotFromState(
+          result.state,
+          resolveWorkspaceKey(workspace),
+          current.selectedPersonaSlug,
+        ),
         latestPatch: result.latestPatch,
         materialAnalysis: result.materialAnalysis,
         weeklyBrief: result.weeklyBrief,
+        routing: result.routing,
       };
     },
   };
@@ -219,7 +275,7 @@ function createDrizzlePersistenceAdapter(databaseUrl: string): PersistenceAdapte
     async getCoachSnapshot(workspace) {
       await ensureStarterData(db, workspace);
       const rows = await fetchCoreRows(db, workspace);
-      return hydrateDemoStateFromPersistenceRows(rows);
+      return hydrateDemoStateFromPersistenceRows(rows, workspace);
     },
     getSelectedPersonaSlug() {
       return DEFAULT_PERSONA_SLUG;
@@ -231,15 +287,20 @@ function createDrizzlePersistenceAdapter(databaseUrl: string): PersistenceAdapte
 
       await ensureStarterData(db, workspace);
       const rows = await fetchCoreRows(db, workspace);
-      return hydrateDemoStateFromPersistenceRows(rows);
+      return hydrateDemoStateFromPersistenceRows(rows, workspace);
     },
     async submitConversation(message, workspace) {
       await ensureStarterData(db, workspace);
 
       const currentRows = await fetchCoreRows(db, workspace);
-      const currentSnapshot = hydrateDemoStateFromPersistenceRows(currentRows);
+      const currentSnapshot = hydrateDemoStateFromPersistenceRows(currentRows, workspace);
       const currentState = snapshotToDemoState(currentSnapshot);
-      const result = continueDemoConversation({ state: currentState, message });
+      const result = await routeConversationInput({
+        state: currentState,
+        message,
+        personaSlug: DEFAULT_PERSONA_SLUG,
+        workspace,
+      });
       const latestFamilyMessage = result.state.conversation.at(-2);
       const latestCoachMessage = result.state.conversation.at(-1);
 
@@ -264,20 +325,26 @@ function createDrizzlePersistenceAdapter(databaseUrl: string): PersistenceAdapte
       }
 
       const persistedRows = await fetchCoreRows(db, workspace);
-      const persistedState = hydrateDemoStateFromPersistenceRows(persistedRows);
+      const persistedState = hydrateDemoStateFromPersistenceRows(persistedRows, workspace);
 
       return {
         state: persistedState,
         reply: result.reply,
+        routing: result.routing,
       };
     },
     async submitMaterial(draft, workspace) {
       await ensureStarterData(db, workspace);
 
       const currentRows = await fetchCoreRows(db, workspace);
-      const currentSnapshot = hydrateDemoStateFromPersistenceRows(currentRows);
+      const currentSnapshot = hydrateDemoStateFromPersistenceRows(currentRows, workspace);
       const currentState = snapshotToDemoState(currentSnapshot);
-      const nextResult = applyDemoMaterial({ state: currentState, draft });
+      const nextResult = await routeMaterialInput({
+        state: currentState,
+        draft,
+        personaSlug: DEFAULT_PERSONA_SLUG,
+        workspace,
+      });
       const latestConversation = nextResult.state.conversation.at(-1);
       const previousConversation = currentState.conversation.at(-1);
 
@@ -299,13 +366,14 @@ function createDrizzlePersistenceAdapter(databaseUrl: string): PersistenceAdapte
       }
 
       const persistedRows = await fetchCoreRows(db, workspace);
-      const persistedState = hydrateDemoStateFromPersistenceRows(persistedRows);
+      const persistedState = hydrateDemoStateFromPersistenceRows(persistedRows, workspace);
 
       return {
         state: persistedState,
         latestPatch: persistedState.patches[0] ?? null,
         materialAnalysis: persistedState.materialAnalysis[0] ?? null,
         weeklyBrief: persistedState.weeklyBrief,
+        routing: nextResult.routing,
       };
     },
   };
@@ -317,8 +385,9 @@ export function buildDrizzleSeedPayload(workspace?: string): {
   conversations: ConversationInsert[];
   weeklyBrief: WeeklyBriefInsert;
 } {
-  const defaultPersona = getDefaultPersona();
-  const starterState = buildPersonaDemoState();
+  const caseSeed = getPilotCaseSeed(workspace);
+  const defaultPersona = getPersonaBySlug(caseSeed.personaSlug);
+  const starterState = buildPersonaDemoState(caseSeed.personaSlug);
   const starterAt = new Date("2026-03-22T14:00:00.000Z");
   const ids = buildWorkspaceEntityIds(workspace);
 
@@ -328,7 +397,7 @@ export function buildDrizzleSeedPayload(workspace?: string): {
       primaryStudentId: ids.studentProfileId,
       primaryGuardianEmail: "demo-family@admitgenie.local",
       timezone: defaultPersona.household.timezone,
-      goalsSummary: defaultPersona.household.goalsSummary,
+      goalsSummary: caseSeed.summary,
       createdAt: starterAt,
       updatedAt: starterAt,
     },
@@ -378,6 +447,16 @@ export async function getDemoStateResponseFromPersistence(workspace?: string) {
   };
 }
 
+export async function getCaseStateResponseFromPersistence(caseId?: string) {
+  const adapter = getSharedDemoPersistenceAdapter();
+
+  return {
+    state: await adapter.getCoachSnapshot(caseId),
+    capabilities: getDemoCapabilities(),
+    readiness: getCaseReadinessStatus(adapter),
+  };
+}
+
 export function getDemoDeploymentStatus(
   adapter: PersistenceAdapter = createPersistenceAdapter(),
 ): DemoDeploymentStatus {
@@ -392,6 +471,32 @@ export function getDemoDeploymentStatus(
     blocker: isDurable
       ? null
       : "Stable shared demo deployment requires DATABASE_URL so the app can persist state outside memory mode.",
+  };
+}
+
+export function getCaseReadinessStatus(
+  adapter: PersistenceAdapter = createPersistenceAdapter(),
+): CaseReadinessStatus {
+  const databaseReady = Boolean(process.env.DATABASE_URL);
+  const openAiConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
+  const blobConfigured = Boolean(
+    process.env.BLOB_READ_WRITE_TOKEN?.trim() ||
+      process.env.VERCEL_BLOB_READ_WRITE_TOKEN?.trim(),
+  );
+
+  return {
+    persistenceKind: adapter.kind,
+    databaseReady,
+    openAiConfigured,
+    durableMode: adapter.kind === "drizzle",
+    blobConfigured,
+    requestCap: 120,
+    blocker:
+      !databaseReady
+        ? "DATABASE_URL is required for durable external pilot cases."
+        : !openAiConfigured
+          ? "OPENAI_API_KEY is required for the external pilot routing layer."
+          : null,
   };
 }
 
@@ -410,15 +515,17 @@ export async function switchDemoPersonaFromPersistence(slug: string, workspace?:
 
 export function hydrateDemoStateFromPersistenceRows(
   rows: PersistedCoreRows,
+  caseId?: string,
 ): CoachSnapshot {
-  const starterState = buildPersonaDemoState();
+  const caseSeed = getPilotCaseSeed(caseId);
+  const starterState = buildPersonaDemoState(caseSeed.personaSlug);
   const sortedConversations = sortByCreatedAtDesc(rows.conversations);
   const sortedMaterials = sortByCreatedAtDesc(rows.materialItems, "submittedAt");
   const sortedPatches = sortByCreatedAtDesc(rows.profilePatches);
   const sortedBriefs = sortByCreatedAtDesc(rows.weeklyBriefs);
   const latestTestingStatus = findLatestTestingStatus(sortedPatches);
   const latestBrief = sortedBriefs[0];
-  const entitySummary = resolveEntitySummary(rows);
+  const entitySummary = resolveEntitySummary(rows, caseSeed.caseId);
   const hydratedPatches: ProfilePatch[] =
     sortedPatches.length > 0
       ? sortedPatches.map((item) => ({
@@ -430,6 +537,71 @@ export function hydrateDemoStateFromPersistenceRows(
       : starterState.patches;
 
   const snapshot: Omit<CoachSnapshot, "decisionCard" | "suggestedReplies"> = {
+    caseRecord: buildCaseRecord(
+      caseSeed.caseId,
+      caseSeed.slug,
+      caseSeed.displayName,
+      entitySummary.household.goalsSummary ?? caseSeed.summary,
+      {
+        conversation:
+          sortedConversations.length > 0
+            ? sortedConversations.map((item) => item.content).reverse()
+            : starterState.conversation,
+        materials:
+          sortedMaterials.length > 0
+            ? sortedMaterials.map((item) => ({
+                id: item.id,
+                type: toMaterialType(item.materialType),
+                title: item.userLabel ?? prettifyMaterialType(item.materialType),
+                content: item.rawText ?? "",
+                submittedAt: item.submittedAt.toISOString(),
+              }))
+            : starterState.materials,
+        patches: hydratedPatches,
+        pendingPatch:
+          hydratedPatches.find(
+            (patch) => patch.status === "needs_confirmation" || patch.status === "conflict",
+          ) ?? starterState.pendingPatch,
+        materialAnalysis:
+          sortedPatches.length > 0
+            ? sortedPatches.map((item) => ({
+                id: `analysis-${item.id}`,
+                materialType: inferMaterialTypeFromPatch(item),
+                patchStatus: toProfilePatchStatus(item.status),
+                extractedFacts: inferExtractedFactsFromPatch(item),
+                affectedFields: inferAffectedFieldsFromPatch(item),
+                profileImpact: item.impactSummary,
+              }))
+            : starterState.materialAnalysis,
+        profileFields: {
+          ...starterState.profileFields,
+          testingStatus: latestTestingStatus
+            ? {
+                label: "Testing",
+                value: latestTestingStatus,
+                status: "known",
+              }
+            : starterState.profileFields.testingStatus,
+          currentFocus:
+            sortedMaterials.length > 0
+              ? {
+                  label: "Current focus",
+                  value: "Use recent materials to sharpen the next coaching brief",
+                  status: "inferred",
+                }
+              : starterState.profileFields.currentFocus,
+        },
+        weeklyBrief: latestBrief
+          ? {
+              whatChanged: latestBrief.whatChanged,
+              whatMatters: latestBrief.whatMatters,
+              topActions: toStringArray(latestBrief.topActionsJson),
+              risks: toStringArray(latestBrief.risksJson),
+              whyThisAdvice: latestBrief.whyThisAdvice,
+            }
+          : starterState.weeklyBrief,
+      },
+    ),
     household: entitySummary.household,
     studentProfile: entitySummary.studentProfile,
     conversation:
@@ -724,18 +896,22 @@ async function resolveDemoEntities(
 
 function snapshotFromState(
   state: DemoState,
+  caseId: string = getPilotCaseSeed().caseId,
   personaSlug: string = DEFAULT_PERSONA_SLUG,
 ): CoachSnapshot {
   const persona = getPersonaBySlug(personaSlug);
+  const caseSeed = getPilotCaseSeed(caseId);
+  const entityIds = buildWorkspaceEntityIds(caseId);
 
   return {
+    caseRecord: buildCaseRecord(caseSeed.caseId, caseSeed.slug, caseSeed.displayName, caseSeed.summary, state),
     household: {
-      id: DEMO_HOUSEHOLD_ID,
+      id: entityIds.householdId,
       timezone: persona.household.timezone,
-      goalsSummary: persona.household.goalsSummary,
+      goalsSummary: caseSeed.summary,
     },
     studentProfile: {
-      id: DEMO_STUDENT_PROFILE_ID,
+      id: entityIds.studentProfileId,
       firstName: persona.studentProfile.firstName,
       gradeLevel: persona.studentProfile.gradeLevel,
       graduationYear: persona.studentProfile.graduationYear,
@@ -898,14 +1074,31 @@ function toProfilePatchStatus(value: string): ProfilePatchStatus {
   return "applied";
 }
 
-function resolveEntitySummary(rows: PersistedCoreRows): {
+function resolveEntitySummary(rows: PersistedCoreRows, caseId?: string): {
+  caseRecord: CoachCaseRecord;
   household: CoachHousehold;
   studentProfile: CoachStudentProfile;
 } {
   const household = rows.households?.[0];
   const studentProfile = rows.studentProfiles?.[0];
+  const fallbackSeed = getPilotCaseSeed(caseId);
 
   return {
+    caseRecord: buildCaseRecord(
+      fallbackSeed.caseId,
+      fallbackSeed.slug,
+      fallbackSeed.displayName,
+      household?.goalsSummary ?? fallbackSeed.summary,
+      {
+        conversation: [],
+        materials: [],
+        patches: [],
+        pendingPatch: null,
+        materialAnalysis: [],
+        profileFields: createInitialDemoState().profileFields,
+        weeklyBrief: createInitialDemoState().weeklyBrief,
+      },
+    ),
     household: household
       ? {
           id: household.id,
@@ -933,6 +1126,39 @@ function defaultCoachHousehold(): CoachHousehold {
     timezone: seed.household.timezone,
     goalsSummary: seed.household.goalsSummary ?? null,
   };
+}
+
+function buildCaseRecord(
+  caseId: string,
+  slug: string,
+  displayName: string,
+  summary: string,
+  state: DemoState,
+): CoachCaseRecord {
+  return {
+    id: caseId,
+    slug,
+    displayName,
+    summary,
+    latestStatus: describeLatestStatus(state),
+    oneNextMove: state.weeklyBrief.topActions[0] ?? "Continue the conversation to lock the next move.",
+  };
+}
+
+function describeLatestStatus(state: DemoState): string {
+  if (state.pendingPatch?.status === "needs_confirmation") {
+    return "A shortlist confirmation is still waiting before strategy can move forward.";
+  }
+
+  if (state.pendingPatch?.status === "conflict") {
+    return "A testing conflict still needs one explicit choice before the plan tightens.";
+  }
+
+  if (state.materialAnalysis[0]?.patchStatus === "applied") {
+    return "The latest material has already been absorbed into the working plan.";
+  }
+
+  return state.profileFields.currentFocus.value;
 }
 
 function defaultCoachStudentProfile(): CoachStudentProfile {

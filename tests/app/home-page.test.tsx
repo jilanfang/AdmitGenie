@@ -14,28 +14,29 @@ vi.mock("@/components/coach-shell", () => ({
 describe("HomePage", () => {
   beforeEach(() => {
     cookiesMock.mockReset();
+    vi.resetModules();
   });
 
-  it("shows the demo access gate when no access cookie is present", async () => {
+  it("shows the pilot access gate when no session cookie is present", async () => {
     cookiesMock.mockResolvedValue({
       get: () => undefined,
     });
 
     const { default: HomePage } = await import("@/app/page");
-    const page = await HomePage();
+    const page = await HomePage({});
 
     render(page);
 
-    expect(screen.getByText(/Step into the conversation/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Enter the shared code and you will land directly inside the coach conversation/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Closed pilot access/i)).toBeInTheDocument();
+    expect(screen.getByText(/Open your active case\./i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Pilot invite/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open the case/i })).toBeInTheDocument();
   });
 
-  it("renders the coach shell after demo access is granted", async () => {
+  it("renders the coach shell after pilot access is granted", async () => {
     cookiesMock.mockResolvedValue({
       get: (name: string) =>
-        name === "admitgenie-demo-access"
+        name === "admitgenie-pilot-session"
           ? {
               value: "granted",
             }
@@ -43,7 +44,7 @@ describe("HomePage", () => {
     });
 
     const { default: HomePage } = await import("@/app/page");
-    const page = await HomePage();
+    const page = await HomePage({});
 
     render(page);
 

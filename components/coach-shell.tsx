@@ -3,11 +3,7 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 
 import type { MaterialDraft, MaterialType } from "@/lib/domain/demo-state";
-import type {
-  CoachSnapshot,
-  DemoDeploymentStatus,
-  DemoPersonaConfig,
-} from "@/lib/server/persistence";
+import type { CaseReadinessStatus, CoachSnapshot } from "@/lib/server/persistence";
 
 const MATERIAL_TYPE_OPTIONS: Array<{ value: MaterialType; label: string }> = [
   { value: "transcript", label: "Transcript" },
@@ -29,6 +25,14 @@ type MaterialComposerState = {
   error: string | null;
 };
 
+type CaseStatePayload = {
+  data?: {
+    state: CoachSnapshot;
+    readiness?: CaseReadinessStatus;
+  };
+  error?: string;
+};
+
 const DEFAULT_COMPOSER_STATE: MaterialComposerState = {
   type: "freeform_note",
   title: "",
@@ -37,54 +41,50 @@ const DEFAULT_COMPOSER_STATE: MaterialComposerState = {
   error: null,
 };
 
-const composerButtonStyle = {
-  border: "1px solid var(--chat-line)",
-  borderRadius: "999px",
-  background: "var(--chat-surface)",
-  color: "var(--chat-ink)",
-  padding: "10px 14px",
-  cursor: "pointer",
-  fontWeight: 600,
-} as const;
-
-const WORKSPACE_STORAGE_KEY = "admitgenie-workspace";
-
 export function CoachShell() {
   const [state, setState] = useState<CoachSnapshot | null>(null);
-  const [demoPersona, setDemoPersona] = useState<DemoPersonaConfig | null>(null);
-  const [deployment, setDeployment] = useState<DemoDeploymentStatus | null>(null);
+  const [readiness, setReadiness] = useState<CaseReadinessStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isApplyingMaterial, setIsApplyingMaterial] = useState(false);
   const [isSendingConversation, setIsSendingConversation] = useState(false);
-  const [isSwitchingPersona, setIsSwitchingPersona] = useState(false);
   const [isBriefOpen, setIsBriefOpen] = useState(false);
-  const [isWorkspacePanelOpen, setIsWorkspacePanelOpen] = useState(false);
+  const [isCasePanelOpen, setIsCasePanelOpen] = useState(false);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false);
   const [conversationDraft, setConversationDraft] = useState("");
   const [materialComposerMode, setMaterialComposerMode] =
     useState<MaterialComposerMode>("closed");
   const [materialComposer, setMaterialComposer] =
     useState<MaterialComposerState>(DEFAULT_COMPOSER_STATE);
-  const [workspaceCode, setWorkspaceCode] = useState("");
   const [decisionSelection, setDecisionSelection] = useState<string[]>([]);
+  const [uiError, setUiError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    const workspace = ensureWorkspaceCode();
-    setWorkspaceCode(workspace);
 
     const loadState = async () => {
-      const payload = await fetchDemoState(workspace);
+      try {
+        const payload = await fetchCaseState();
 
-      if (!active) {
-        return;
+        if (!active) {
+          return;
+        }
+
+        setState(payload.data?.state ?? null);
+        setReadiness(payload.data?.readiness ?? null);
+        setDecisionSelection([]);
+        setUiError(null);
+      } catch {
+        if (!active) {
+          return;
+        }
+
+        setUiError("We could not load this case right now.");
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
       }
-
-      setState(payload.data?.state ?? null);
-      setDemoPersona(payload.data?.demoPersona ?? null);
-      setDeployment(payload.data?.deployment ?? null);
-      setDecisionSelection([]);
-      setIsLoading(false);
     };
 
     void loadState();
@@ -94,64 +94,68 @@ export function CoachShell() {
     };
   }, []);
 
-  const applySatUpdate = async () => {
-    setIsApplyingMaterial(true);
-
-    try {
-      const nextState = await submitMaterial({
-        type: "test_score",
-        title: "March SAT",
-        content: "New SAT update: Math 760, Reading and Writing 730.",
-      }, workspaceCode);
-      setState(nextState);
-    } finally {
-      setIsApplyingMaterial(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
     }
-  };
 
-  const reloadState = async (workspace: string) => {
-    setIsLoading(true);
+    const mediaQuery = window.matchMedia("(min-width: 1100px)");
+    const syncLayoutMode = () => {
+      setIsDesktopLayout(mediaQuery.matches);
+      if (mediaQuery.matches) {
+        setIsCasePanelOpen(false);
+      }
+    };
 
-    try {
-      const payload = await fetchDemoState(workspace);
-      setState(payload.data?.state ?? null);
-      setDemoPersona(payload.data?.demoPersona ?? null);
-      setDeployment(payload.data?.deployment ?? null);
-      setIsBriefOpen(false);
-      setConversationDraft("");
-      setDecisionSelection([]);
-      setIsWorkspacePanelOpen(false);
-      setIsAttachmentMenuOpen(false);
-      closeMaterialComposer();
-    } finally {
-      setIsLoading(false);
+    syncLayoutMode();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", syncLayoutMode);
+      return () => mediaQuery.removeEventListener("change", syncLayoutMode);
     }
-  };
+
+    mediaQuery.addListener(syncLayoutMode);
+    return () => mediaQuery.removeListener(syncLayoutMode);
+  }, []);
 
   const sendConversation = async (message: string) => {
     setIsSendingConversation(true);
+    setUiError(null);
 
     try {
-      const response = await fetch("/api/demo/conversation", {
+      const response = await fetch("/api/case/conversation", {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
         body: JSON.stringify({
           message,
-          workspace: workspaceCode,
         }),
       });
       const payload = (await response.json()) as {
+        ok: boolean;
+        error?: string;
         data?: {
           state: CoachSnapshot;
         };
       };
+
+      if (!response.ok) {
+        handleCaseRouteFailure(response.status, payload.error);
+        return;
+      }
+
       setState(payload.data?.state ?? null);
       setIsBriefOpen(false);
       setConversationDraft("");
       setDecisionSelection([]);
       setIsAttachmentMenuOpen(false);
+    } catch (error) {
+      setUiError(
+        error instanceof Error
+          ? error.message
+          : "We could not send that message right now. Please try again.",
+      );
     } finally {
       setIsSendingConversation(false);
     }
@@ -165,44 +169,6 @@ export function CoachShell() {
     }
 
     await sendConversation(message);
-  };
-
-  const switchPersona = async (slug: string) => {
-    setIsSwitchingPersona(true);
-
-    try {
-      const response = await fetch("/api/demo/persona", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ slug, workspace: workspaceCode }),
-      });
-      const payload = (await response.json()) as DemoStatePayload;
-      setState(payload.data?.state ?? null);
-      setDemoPersona(payload.data?.demoPersona ?? null);
-      setIsBriefOpen(false);
-      setConversationDraft("");
-      setDecisionSelection([]);
-      setIsWorkspacePanelOpen(false);
-      closeMaterialComposer();
-    } finally {
-      setIsSwitchingPersona(false);
-    }
-  };
-
-  const leaveDemo = async () => {
-    await fetch("/api/demo/logout", {
-      method: "POST",
-    });
-    window.location.reload();
-  };
-
-  const startNewChat = async () => {
-    const nextWorkspace = createWorkspaceCode();
-    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, nextWorkspace);
-    setWorkspaceCode(nextWorkspace);
-    await reloadState(nextWorkspace);
   };
 
   const openMaterialComposer = (mode: Exclude<MaterialComposerMode, "closed">) => {
@@ -254,24 +220,50 @@ export function CoachShell() {
 
     if (title.length === 0 || content.length === 0) {
       updateMaterialComposer({
-        error: "Add both a title and material content before submitting.",
+        error: "Add both a short label and the material content before sharing it.",
       });
       return;
     }
 
     setIsApplyingMaterial(true);
+    setUiError(null);
 
     try {
-      const nextState = await submitMaterial({
-        type: materialComposer.type,
-        title,
-        content,
-      }, workspaceCode);
-      setState(nextState);
-      if (nextState?.materialAnalysis[0]?.patchStatus) {
-        setIsBriefOpen(false);
+      const response = await fetch("/api/case/materials", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          draft: {
+            type: materialComposer.type,
+            title,
+            content,
+          },
+        }),
+      });
+      const payload = (await response.json()) as {
+        ok: boolean;
+        error?: string;
+        data?: {
+          state: CoachSnapshot;
+        };
+      };
+
+      if (!response.ok) {
+        handleCaseRouteFailure(response.status, payload.error);
+        return;
       }
+
+      setState(payload.data?.state ?? null);
+      setIsBriefOpen(false);
       closeMaterialComposer();
+    } catch (error) {
+      setUiError(
+        error instanceof Error
+          ? error.message
+          : "We could not process that material right now. Please try again.",
+      );
     } finally {
       setIsApplyingMaterial(false);
     }
@@ -280,17 +272,21 @@ export function CoachShell() {
   if (isLoading || !state) {
     return (
       <main className="coach-shell-page">
-        <div className="coach-shell-loading">Getting your coach ready...</div>
+        <div className="coach-shell-loading">Opening your case...</div>
       </main>
     );
   }
 
   const latestMaterialAnalysis = state.materialAnalysis[0] ?? null;
-  const shouldShowBriefEntry = latestMaterialAnalysis !== null;
+  const latestPatch = state.patches[0] ?? null;
   const latestDecisionCard = state.decisionCard;
   const suggestedReplies = state.suggestedReplies;
-  const selectedPersona =
-    demoPersona?.options.find((persona) => persona.slug === demoPersona.selectedSlug) ?? null;
+  const isCasePanelVisible = isDesktopLayout || isCasePanelOpen;
+  const isStarterStage =
+    state.conversation.length <= 2 &&
+    suggestedReplies.length > 0 &&
+    latestMaterialAnalysis === null &&
+    latestDecisionCard === null;
   const isDecisionReady =
     latestDecisionCard?.type === "multi_select"
       ? decisionSelection.length > 0
@@ -338,115 +334,79 @@ export function CoachShell() {
     await sendConversation(message);
   };
 
-  const formatConversationMessage = (message: string) => {
-    if (message.startsWith("Family: ")) {
-      return message.replace(/^Family:\s*/, "");
-    }
-
-    if (message.startsWith("Coach: ")) {
-      return message.replace(/^Coach:\s*/, "");
-    }
-
-    return message;
-  };
-
   return (
     <main className="coach-shell-page">
-      <div className="chat-shell">
-        <button
-          className="chat-shell__panel-toggle"
-          type="button"
-          aria-expanded={isWorkspacePanelOpen}
-          aria-label="Open workspace panel"
-          onClick={() => setIsWorkspacePanelOpen((current) => !current)}
-        >
-          More
-        </button>
+      <div className={`chat-shell${isDesktopLayout ? " chat-shell--desktop" : ""}`}>
+        {!isDesktopLayout ? (
+          <button
+            className="chat-shell__panel-toggle"
+            type="button"
+            aria-expanded={isCasePanelOpen}
+            aria-label="Open case details"
+            onClick={() => setIsCasePanelOpen((current) => !current)}
+          >
+            Case
+          </button>
+        ) : null}
 
-        {isWorkspacePanelOpen ? (
+        {isCasePanelVisible ? (
           <>
-            <button
-              className="chat-shell__panel-scrim"
-              type="button"
-              aria-label="Close workspace panel"
-              onClick={() => setIsWorkspacePanelOpen(false)}
-            />
-            <aside className="chat-side-panel">
+            {!isDesktopLayout ? (
+              <button
+                className="chat-shell__panel-scrim"
+                type="button"
+                aria-label="Close case details"
+                onClick={() => setIsCasePanelOpen(false)}
+              />
+            ) : null}
+            <aside className={`chat-side-panel${isDesktopLayout ? " chat-side-panel--docked" : ""}`}>
               <div className="chat-side-panel__header">
-                <strong>Behind the scenes</strong>
-                <button
-                  type="button"
-                  aria-label="Close workspace panel"
-                  onClick={() => setIsWorkspacePanelOpen(false)}
-                >
-                  Close
-                </button>
-              </div>
-
-              <div className="chat-side-panel__section">
-                <button
-                  style={composerButtonStyle}
-                  type="button"
-                  onClick={() => void startNewChat()}
-                >
-                  New chat
-                </button>
-                <button
-                  style={composerButtonStyle}
-                  type="button"
-                  onClick={() => void applySatUpdate()}
-                >
-                  {isApplyingMaterial ? "Updating..." : "Try SAT sample"}
-                </button>
-              </div>
-
-              {demoPersona?.canSwitch ? (
-                <label className="chat-side-panel__field">
-                  <span>Demo persona</span>
-                  <select
-                    aria-label="Demo persona"
-                    value={demoPersona.selectedSlug}
-                    disabled={isSwitchingPersona}
-                    onChange={(event) => void switchPersona(event.target.value)}
+                <strong>{state.caseRecord.displayName}</strong>
+                {!isDesktopLayout ? (
+                  <button
+                    type="button"
+                    aria-label="Close case details"
+                    onClick={() => setIsCasePanelOpen(false)}
                   >
-                    {demoPersona.options.map((persona) => (
-                      <option key={persona.slug} value={persona.slug}>
-                        {persona.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-
-              <div className="chat-side-panel__note">
-                <strong>{selectedPersona?.name ?? "Current scenario"}</strong>
-                <p>{selectedPersona?.summary ?? "Current coaching scenario."}</p>
-                <small>
-                  {deployment?.readyForSharedDemo
-                    ? "This case is running in durable mode and will still be here when you come back."
-                    : "This case is running in local memory mode, so it resets if the demo restarts."}
-                </small>
-              </div>
-
-              <div className="chat-side-panel__meta">
-                <span>Workspace code: {workspaceCode}</span>
-                {deployment?.blocker ? (
-                  <small>{deployment.blocker}</small>
+                    Close
+                  </button>
                 ) : null}
               </div>
 
-              <button
-                className="chat-side-panel__link"
-                type="button"
-                onClick={() => void leaveDemo()}
-              >
-                Leave demo
-              </button>
+              <label className="chat-side-panel__field">
+                <span>Active case</span>
+                <div className="chat-side-panel__value">
+                  <strong>{state.studentProfile.gradeLevel}</strong>
+                  <small>{state.studentProfile.majorDirection ?? "North America admissions planning"}</small>
+                </div>
+              </label>
+
+              <div className="chat-side-panel__note">
+                <strong>Case summary</strong>
+                <p>{state.caseRecord.summary}</p>
+              </div>
+
+              <div className="chat-side-panel__note">
+                <strong>Latest status</strong>
+                <p>{state.caseRecord.latestStatus}</p>
+              </div>
+
+              <div className="chat-side-panel__note">
+                <strong>One next move</strong>
+                <p>{state.caseRecord.oneNextMove}</p>
+              </div>
+
+              <div className="chat-side-panel__meta">
+                <span>{state.studentProfile.firstName ?? state.caseRecord.displayName}</span>
+                {readiness?.blocker ? <small>{readiness.blocker}</small> : null}
+              </div>
             </aside>
           </>
         ) : null}
 
-        <section className="chat-main chat-main--single-column">
+        <section
+          className={`chat-main chat-main--single-column${isDesktopLayout ? " chat-main--with-rail" : ""}${isStarterStage ? " chat-main--starter" : ""}`}
+        >
           <header className="sr-only">
             <h1>Let&apos;s figure out the next best step.</h1>
             <p>
@@ -455,34 +415,43 @@ export function CoachShell() {
             </p>
           </header>
 
-          <div className="chat-main__stream">
-            {state.conversation.map((message, index) => {
-                const isUser = message.startsWith("Family:");
-                const isOpeningCoach = !isUser && index < 2;
-                const isSummaryCoach =
-                  !isUser &&
-                  /here's where i think things stand:|what i'd focus on this month:|what would help me guide you better next:/i.test(
-                    message,
-                  );
-                const bubbleClass = [
-                  "chat-bubble",
-                  isUser ? "chat-bubble--user" : "chat-bubble--coach",
-                  isOpeningCoach
-                    ? index === 0
-                      ? "chat-bubble--opening-primary"
-                      : "chat-bubble--opening-secondary"
-                    : "",
-                  isSummaryCoach ? "chat-bubble--summary" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ");
+          {isStarterStage ? (
+            <div className="chat-main__starter-heading" aria-hidden="true">
+              <h2>Where should we start?</h2>
+              <p>
+                Tell me what feels unclear, or drop in a score, school list, or family update.
+              </p>
+            </div>
+          ) : null}
 
-                return (
-                  <article key={`${message}-${index}`} className={bubbleClass}>
-                    <p>{formatConversationMessage(message)}</p>
-                  </article>
+          <div className={`chat-main__stream${isStarterStage ? " chat-main__stream--starter" : ""}`}>
+            {state.conversation.map((message, index) => {
+              const isUser = message.startsWith("Family:");
+              const isOpeningCoach = !isUser && index < 2;
+              const isSummaryCoach =
+                !isUser &&
+                /here's where i think things stand:|what i'd focus on this month:|what would help me guide you better next:/i.test(
+                  message,
                 );
-              })}
+              const bubbleClass = [
+                "chat-bubble",
+                isUser ? "chat-bubble--user" : "chat-bubble--coach",
+                isOpeningCoach
+                  ? index === 0
+                    ? "chat-bubble--opening-primary"
+                    : "chat-bubble--opening-secondary"
+                  : "",
+                isSummaryCoach ? "chat-bubble--summary" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+
+              return (
+                <article key={`${message}-${index}`} className={bubbleClass}>
+                  <p>{formatConversationMessage(message)}</p>
+                </article>
+              );
+            })}
 
             {suggestedReplies.length > 0 ? (
               <article className="chat-bubble chat-bubble--coach chat-bubble--suggested">
@@ -502,20 +471,25 @@ export function CoachShell() {
               </article>
             ) : null}
 
-            {latestMaterialAnalysis ? (
+            {latestMaterialAnalysis && latestPatch ? (
               <article className="chat-bubble chat-bubble--coach chat-bubble--insert">
-                <div className="chat-bubble__label">A note from me</div>
-                <p>{state.patches[0]?.summary}</p>
-                <p className="chat-bubble__meta">{latestMaterialAnalysis.profileImpact}</p>
-                {shouldShowBriefEntry ? (
-                  <button
-                    className="chat-composer__send"
-                    type="button"
-                    onClick={() => setIsBriefOpen((current) => !current)}
-                  >
-                    {isBriefOpen ? "Hide the extra detail" : "See why I'm saying that"}
-                  </button>
+                <div className="chat-bubble__label">{describeMaterialOutcome(latestMaterialAnalysis.patchStatus)}</div>
+                <p>{latestPatch.summary}</p>
+                <p className="chat-bubble__meta">
+                  {latestMaterialAnalysis.profileImpact}
+                </p>
+                {latestMaterialAnalysis.extractedFacts.length > 0 ? (
+                  <p className="chat-bubble__meta">
+                    Source signals: {latestMaterialAnalysis.extractedFacts.join(" · ")}
+                  </p>
                 ) : null}
+                <button
+                  className="chat-composer__send"
+                  type="button"
+                  onClick={() => setIsBriefOpen((current) => !current)}
+                >
+                  {isBriefOpen ? "Hide the extra detail" : "See why I am taking this angle"}
+                </button>
               </article>
             ) : null}
 
@@ -562,34 +536,41 @@ export function CoachShell() {
                   <strong>What matters most right now:</strong> {state.weeklyBrief.whatMatters}
                 </p>
                 <p>
-                  <strong>What I'd do next:</strong> {state.weeklyBrief.topActions.join(" ")}
+                  <strong>What I&apos;d do next:</strong> {state.weeklyBrief.topActions.join(" ")}
                 </p>
                 <p>
                   <strong>What I want us to watch:</strong> {state.weeklyBrief.risks.join(" ")}
                 </p>
                 <p>
-                  <strong>Why I'm taking this angle:</strong> {state.weeklyBrief.whyThisAdvice}
+                  <strong>Why I&apos;m taking this angle:</strong> {state.weeklyBrief.whyThisAdvice}
                 </p>
+              </article>
+            ) : null}
+
+            {uiError ? (
+              <article className="chat-bubble chat-bubble--coach chat-bubble--insert">
+                <div className="chat-bubble__label">Heads up</div>
+                <p>{uiError}</p>
               </article>
             ) : null}
           </div>
 
-          <div className="chat-composer">
+          <div className={`chat-composer${isStarterStage ? " chat-composer--starter" : ""}`}>
             {isAttachmentMenuOpen ? (
               <div className="chat-composer__attachment-menu">
                 <button
-                  style={composerButtonStyle}
+                  className="chat-button chat-button--secondary"
                   type="button"
                   onClick={() => openMaterialComposer("upload")}
                 >
-                  Upload something
+                  Upload a file
                 </button>
                 <button
-                  style={composerButtonStyle}
+                  className="chat-button chat-button--secondary"
                   type="button"
                   onClick={() => openMaterialComposer("paste")}
                 >
-                  Paste something
+                  Paste an update
                 </button>
               </div>
             ) : null}
@@ -611,7 +592,7 @@ export function CoachShell() {
                   className="chat-composer__input"
                   value={conversationDraft}
                   onChange={(event) => setConversationDraft(event.target.value)}
-                  placeholder="Tell the coach what grade you're in, what you're aiming for, what feels unclear, or say that you want to add a score, school list, or update."
+                  placeholder="Tell the coach what feels unclear, what changed, or what you want to decide next."
                 />
               </label>
               <div className="chat-composer__actions">
@@ -631,8 +612,8 @@ export function CoachShell() {
                 <div className="chat-material-sheet__header">
                   <strong>
                     {materialComposerMode === "upload"
-                      ? "Share a file"
-                      : "Paste something new"}
+                      ? "Share a document or note"
+                      : "Paste a new update"}
                   </strong>
                   <button type="button" onClick={closeMaterialComposer}>
                     Cancel
@@ -676,7 +657,7 @@ export function CoachShell() {
 
                 {materialComposerMode === "upload" ? (
                   <label className="chat-material-sheet__upload">
-                    <span>Choose a file</span>
+                    <span>Choose a plain-text file</span>
                     <input
                       aria-label="File upload"
                       type="file"
@@ -696,7 +677,7 @@ export function CoachShell() {
                         content: event.target.value,
                       })
                     }
-                    placeholder="Paste a score, school list, activity, or family update."
+                    placeholder="Paste a score report, school list, activity update, or family note."
                   />
                 </label>
 
@@ -717,7 +698,7 @@ export function CoachShell() {
                   type="button"
                   onClick={() => void handleMaterialSubmit()}
                 >
-                  {isApplyingMaterial ? "Adding..." : "Share with coach"}
+                  {isApplyingMaterial ? "Sharing..." : "Share with coach"}
                 </button>
               </div>
             ) : null}
@@ -728,52 +709,48 @@ export function CoachShell() {
   );
 }
 
-async function submitMaterial(
-  draft: MaterialDraft,
-  workspace: string,
-): Promise<CoachSnapshot | null> {
-  const response = await fetch("/api/demo/materials", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ draft, workspace }),
-  });
-  const payload = (await response.json()) as {
-    data?: {
-      state: CoachSnapshot;
-      materialAnalysis?: CoachSnapshot["materialAnalysis"][number] | null;
-    };
-  };
+async function fetchCaseState(): Promise<CaseStatePayload> {
+  const response = await fetch("/api/case/state");
 
-  return payload.data?.state ?? null;
-}
-
-type DemoStatePayload = {
-  data?: {
-    state: CoachSnapshot;
-    demoPersona?: DemoPersonaConfig;
-    deployment?: DemoDeploymentStatus;
-  };
-};
-
-async function fetchDemoState(workspace: string): Promise<DemoStatePayload> {
-  const response = await fetch(`/api/demo/state?workspace=${encodeURIComponent(workspace)}`);
-  return (await response.json()) as DemoStatePayload;
-}
-
-function ensureWorkspaceCode(): string {
-  const existing = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
-
-  if (existing && existing.trim().length > 0) {
-    return existing;
+  if (response.status === 401) {
+    window.location.reload();
+    return {};
   }
 
-  const next = createWorkspaceCode();
-  window.localStorage.setItem(WORKSPACE_STORAGE_KEY, next);
-  return next;
+  return (await response.json()) as CaseStatePayload;
 }
 
-function createWorkspaceCode(): string {
-  return `workspace-${Math.random().toString(36).slice(2, 10)}`;
+function handleCaseRouteFailure(status: number, error?: string) {
+  if (status === 401) {
+    window.location.reload();
+    return;
+  }
+
+  throw new Error(error ?? "Case request failed.");
+}
+
+function formatConversationMessage(message: string) {
+  if (message.startsWith("Family: ")) {
+    return message.replace(/^Family:\s*/, "");
+  }
+
+  if (message.startsWith("Coach: ")) {
+    return message.replace(/^Coach:\s*/, "");
+  }
+
+  return message;
+}
+
+function describeMaterialOutcome(
+  patchStatus: CoachSnapshot["materialAnalysis"][number]["patchStatus"],
+) {
+  if (patchStatus === "needs_confirmation") {
+    return "Decision needed";
+  }
+
+  if (patchStatus === "conflict") {
+    return "Conflict detected";
+  }
+
+  return "Saved and summarized";
 }

@@ -1,19 +1,27 @@
-# AdmitGenie MVP Scaffold
+# AdmitGenie Closed Pilot POC
 
-This repository contains the first working scaffold for the AdmitGenie AI-native admissions coach MVP.
+AdmitGenie is a chat-first admissions coach for North America-focused families and counselors. This repo now targets an external `closed pilot POC`, not an internal shared demo.
+
+## Product shape
+
+- Single active case per session
+- Invite-only access, no public signup
+- English-only customer experience
+- Chat-first shell with chat cards for confirmation
+- Deterministic state engine with OpenAI-first routing layered on top
 
 ## What is included
 
-- `docs/`
-  Product, workflow, and technical planning docs for the MVP.
 - `app/`
-  A minimal Next.js App Router experience for the `Coach Inbox`.
+  Next.js App Router UI and API routes for `case` and `session` flows.
 - `components/coach-shell.tsx`
-  Demo UI showing guided interview, hidden profile state, material inbox, and monthly brief framing.
-- `lib/domain/demo-state.ts`
-  Mock domain logic for profile patches and brief regeneration after new material arrives.
+  External POC shell with the main chat stream, compact case rail, sticky composer, and lightweight attachment flow.
+- `lib/server/`
+  Persistence adapter, pilot invite/session access, routing policy, and POC ops helpers.
+- `docs/`
+  Product source docs, customer corpus, deployment notes, and journey coverage artifacts.
 - `tests/`
-  Basic domain, UI, and build-script regression coverage.
+  Domain, API, routing, and UI regressions including journey-report generation.
 
 ## Run locally
 
@@ -21,34 +29,54 @@ This repository contains the first working scaffold for the AdmitGenie AI-native
 pnpm install
 pnpm test
 pnpm build
-pnpm dev
+pnpm dev -- --port 3101
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3101](http://localhost:3101).
 
-## Vercel Demo Deployment
+Default local pilot invites:
 
-For a stable shareable demo on Vercel, set `DATABASE_URL` before deploying.
+- Family: `admitgenie-family-pilot`
+- Counselor: `admitgenie-counselor-pilot`
 
-- Without `DATABASE_URL`, the app falls back to in-memory demo mode.
-- In-memory mode is useful for local iteration, but it is not stable for a shared Vercel demo.
-- The UI now surfaces this directly as `Ephemeral demo mode`.
+You can override them with env vars.
 
-Recommended hosted demo path:
+## API surface
 
-1. Create a Neon Postgres database.
-2. Add `DATABASE_URL` in Vercel project environment variables.
-3. Run `pnpm db:push` against that database before or during first deploy setup.
-4. Deploy to Vercel.
-5. Verify:
-   - `/api/demo/state`
-   - `/api/demo/readiness`
-   - `/api/demo/materials`
+Primary external POC routes:
+
+- `POST /api/session/access`
+- `POST /api/session/logout`
+- `GET /api/case/state`
+- `POST /api/case/conversation`
+- `POST /api/case/materials`
+- `GET /api/case/readiness`
+
+Legacy `/api/demo/*` routes remain only as an internal compatibility layer for regression flows.
+
+## Deployment
+
+The recommended deployment target is Vercel + Neon, with durable case persistence enabled by `DATABASE_URL`.
+
+Before shipping a pilot build:
+
+```bash
+pnpm test
+pnpm build
+pnpm test:routing-report
+```
+
+Then verify:
+
+- invite entry works
+- case state persists across reloads
+- material upload outcomes stay visible in chat
+- shortlist/conflict decisions still use chat cards
 
 See [docs/deployment/vercel-demo.md](./docs/deployment/vercel-demo.md).
 
 ## Notes
 
-- The default production build uses `next build --webpack`.
-- This is intentional for the current scaffold because the default Turbopack build path hit an environment-level process/port restriction during verification.
-- The app is still a demo-state scaffold; Auth.js, Drizzle, Neon, Blob, and AI route handlers are documented but not wired yet.
+- The production build intentionally uses `next build --webpack`.
+- Without `DATABASE_URL`, the app falls back to memory mode for local iteration only.
+- OpenAI routing is feature-flagged and always falls back to deterministic policy-safe behavior if classification or response generation fails.

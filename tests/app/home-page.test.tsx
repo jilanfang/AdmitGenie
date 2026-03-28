@@ -1,7 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const cookiesMock = vi.fn();
+import HomePage from "@/app/page";
+
+const { cookiesMock } = vi.hoisted(() => ({
+  cookiesMock: vi.fn(),
+}));
 
 vi.mock("next/headers", () => ({
   cookies: cookiesMock,
@@ -14,7 +18,6 @@ vi.mock("@/components/coach-shell", () => ({
 describe("HomePage", () => {
   beforeEach(() => {
     cookiesMock.mockReset();
-    vi.resetModules();
   });
 
   it("shows the pilot access gate when no session cookie is present", async () => {
@@ -22,7 +25,6 @@ describe("HomePage", () => {
       get: () => undefined,
     });
 
-    const { default: HomePage } = await import("@/app/page");
     const page = await HomePage({});
 
     render(page);
@@ -43,7 +45,6 @@ describe("HomePage", () => {
           : undefined,
     });
 
-    const { default: HomePage } = await import("@/app/page");
     const page = await HomePage({});
 
     render(page);

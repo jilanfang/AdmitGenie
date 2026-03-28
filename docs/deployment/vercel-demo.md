@@ -38,6 +38,15 @@ OPENAI_RESPONSE_MODEL=gpt-4o
 PILOT_FAMILY_INVITE_TOKEN=your-family-pilot-token
 PILOT_COUNSELOR_INVITE_TOKEN=your-counselor-pilot-token
 BLOB_READ_WRITE_TOKEN=vercel_blob_rw_token_optional
+PILOT_BASE_URL=https://your-project.vercel.app
+```
+
+Useful local helpers:
+
+```bash
+pnpm poc:generate-invites
+pnpm poc:check-env
+pnpm poc:smoke
 ```
 
 ## Deploy Steps
@@ -45,7 +54,7 @@ BLOB_READ_WRITE_TOKEN=vercel_blob_rw_token_optional
 1. Create a Neon database.
 2. Copy the connection string into Vercel as `DATABASE_URL`.
 3. Add the OpenAI and invite-token environment variables.
-3. From the repo, run:
+4. From the repo, run:
 
 ```bash
 pnpm install
@@ -53,10 +62,12 @@ pnpm db:push
 pnpm test
 pnpm build
 pnpm test:routing-report
+pnpm poc:check-env
 ```
 
-4. Deploy the project to Vercel.
-5. Open a pilot invite link such as `https://your-app.vercel.app/?invite=<token>`.
+5. Deploy the project to Vercel.
+6. Set `PILOT_BASE_URL=https://your-app.vercel.app` locally and run `pnpm poc:smoke`.
+7. Open a pilot invite link such as `https://your-app.vercel.app/?invite=<token>`.
 
 ## Smoke Check
 

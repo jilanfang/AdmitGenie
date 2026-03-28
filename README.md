@@ -41,6 +41,18 @@ Default local pilot invites:
 
 You can override them with env vars.
 
+Helpful external POC commands:
+
+```bash
+pnpm poc:generate-invites
+pnpm poc:check-env
+pnpm poc:smoke
+```
+
+- `poc:generate-invites` prints secure family/counselor invite tokens
+- `poc:check-env` validates the required Production env vars
+- `poc:smoke` hits the deployed Vercel URL and verifies the main pilot flow
+
 ## API surface
 
 Primary external POC routes:
@@ -64,6 +76,7 @@ Before shipping a pilot build:
 pnpm test
 pnpm build
 pnpm test:routing-report
+pnpm poc:check-env
 ```
 
 Then verify:

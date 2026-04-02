@@ -457,4 +457,41 @@ describe("CoachShell", () => {
       );
     });
   });
+
+  it("shows a stable user-facing error when the conversation endpoint returns a non-json failure", async () => {
+    const user = userEvent.setup();
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === "/api/case/state") {
+        return Response.json({
+          ok: true,
+          data: {
+            state: createPrivateStarterSnapshot(),
+            readiness: createReadinessStatus(),
+          },
+        });
+      }
+
+      if (url === "/api/case/conversation") {
+        return new Response(null, {
+          status: 500,
+          statusText: "Internal Server Error",
+        });
+      }
+
+      throw new Error(`Unexpected fetch call: ${url} ${init?.method ?? "GET"}`);
+    }) as typeof fetch;
+
+    render(<CoachShell privateReturnUrl="/?invite=private-access-demo&entry=private" />);
+    await screen.findByText(/Where should we start\?/i);
+
+    await user.click(screen.getByRole("button", { name: /I'm in 11th grade/i }));
+
+    expect(
+      await screen.findByText(/We could not send that message right now\. Please try again\./i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Unexpected end of JSON input/i)).not.toBeInTheDocument();
+  });
 });

@@ -3,7 +3,9 @@ import { POST as postCaseMaterials } from "@/app/api/case/materials/route";
 import { GET as getCaseReadiness } from "@/app/api/case/readiness/route";
 import { GET as getCaseState } from "@/app/api/case/state/route";
 import { POST as postSessionAccess } from "@/app/api/session/access/route";
+import * as persistence from "@/lib/server/persistence";
 import { resetDemoPersistenceForTests } from "@/lib/server/persistence";
+import { vi } from "vitest";
 
 async function createPilotSessionCookie(inviteToken = "admitgenie-family-pilot") {
   const response = await postSessionAccess(
@@ -199,6 +201,36 @@ describe("case api routes", () => {
     expect(json.data.state.conversation.at(-2)).toMatch(/Family:/i);
     expect(json.data.routing.responseMode).toBe("chat_only");
     expect(json.data.routing.writeExecuted).toBe(true);
+  });
+
+  it("returns a json error when conversation persistence throws unexpectedly", async () => {
+    const { cookie } = await createPilotSessionCookie();
+    const submitConversation = vi
+      .spyOn(persistence.getSharedDemoPersistenceAdapter(), "submitConversation")
+      .mockRejectedValueOnce(new Error("database unavailable"));
+
+    const response = await postCaseConversation(
+      new Request("http://localhost/api/case/conversation", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(cookie ? { cookie } : {}),
+        },
+        body: JSON.stringify({
+          message: "I'm in 11th grade and want to build a clear admissions plan.",
+        }),
+      }),
+    );
+    const json = (await response.json()) as {
+      ok: boolean;
+      error: string;
+    };
+
+    expect(response.status).toBe(500);
+    expect(json.ok).toBe(false);
+    expect(json.error).toMatch(/could not process that message/i);
+
+    submitConversation.mockRestore();
   });
 
   it("rejects oversized material uploads for the pilot path", async () => {

@@ -133,16 +133,20 @@ export function CoachShell(props: { privateReturnUrl?: string | null }) {
           message,
         }),
       });
-      const payload = (await response.json()) as {
+      const payload = await readJsonPayload<{
         ok: boolean;
         error?: string;
         data?: {
           state: CoachSnapshot;
         };
-      };
+      }>(response);
 
       if (!response.ok) {
-        handleCaseRouteFailure(response.status, payload.error);
+        handleCaseRouteFailure(
+          response.status,
+          payload?.error,
+          "We could not send that message right now. Please try again.",
+        );
         return;
       }
 
@@ -243,16 +247,20 @@ export function CoachShell(props: { privateReturnUrl?: string | null }) {
           },
         }),
       });
-      const payload = (await response.json()) as {
+      const payload = await readJsonPayload<{
         ok: boolean;
         error?: string;
         data?: {
           state: CoachSnapshot;
         };
-      };
+      }>(response);
 
       if (!response.ok) {
-        handleCaseRouteFailure(response.status, payload.error);
+        handleCaseRouteFailure(
+          response.status,
+          payload?.error,
+          "We could not process that material right now. Please try again.",
+        );
         return;
       }
 
@@ -764,16 +772,30 @@ async function fetchCaseState(): Promise<CaseStatePayload> {
     return {};
   }
 
-  return (await response.json()) as CaseStatePayload;
+  return (await readJsonPayload<CaseStatePayload>(response)) ?? {};
 }
 
-function handleCaseRouteFailure(status: number, error?: string) {
+async function readJsonPayload<T>(response: Response): Promise<T | null> {
+  const raw = await response.text();
+
+  if (raw.trim().length === 0) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function handleCaseRouteFailure(status: number, error: string | undefined, fallbackMessage: string) {
   if (status === 401) {
     window.location.reload();
     return;
   }
 
-  throw new Error(error ?? "Case request failed.");
+  throw new Error(error ?? fallbackMessage);
 }
 
 function resolvePrivateReturnUrl(explicitUrl?: string | null): string | null {

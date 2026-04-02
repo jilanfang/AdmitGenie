@@ -150,7 +150,13 @@ export function CoachShell(props: { privateReturnUrl?: string | null }) {
         return;
       }
 
-      setState(payload.data?.state ?? null);
+      const nextState = payload?.data?.state;
+
+      if (!nextState) {
+        throw new Error("We could not send that message right now. Please try again.");
+      }
+
+      setState(nextState);
       setIsBriefOpen(false);
       setConversationDraft("");
       setDecisionSelection([]);
@@ -264,7 +270,13 @@ export function CoachShell(props: { privateReturnUrl?: string | null }) {
         return;
       }
 
-      setState(payload.data?.state ?? null);
+      const nextState = payload?.data?.state;
+
+      if (!nextState) {
+        throw new Error("We could not process that material right now. Please try again.");
+      }
+
+      setState(nextState);
       setIsBriefOpen(false);
       closeMaterialComposer();
     } catch (error) {

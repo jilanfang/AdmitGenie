@@ -453,7 +453,6 @@ export function CoachShell(props: { privateReturnUrl?: string | null }) {
 
               <div className="chat-side-panel__meta">
                 <span>{state.studentProfile.firstName ?? state.caseRecord.displayName}</span>
-                {readiness?.blocker ? <small>{readiness.blocker}</small> : null}
               </div>
             </aside>
           </>

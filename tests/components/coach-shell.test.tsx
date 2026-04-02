@@ -494,4 +494,37 @@ describe("CoachShell", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/Unexpected end of JSON input/i)).not.toBeInTheDocument();
   });
+
+  it("does not expose internal readiness blockers in the family-facing case rail", async () => {
+    const restoreMatchMedia = mockDesktopLayout();
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === "/api/case/state") {
+        return Response.json({
+          ok: true,
+          data: {
+            state: createPrivateStarterSnapshot(),
+            readiness: {
+              ...createReadinessStatus(),
+              openAiConfigured: false,
+              blocker: "OPENAI_API_KEY is required for the external pilot routing layer.",
+            },
+          },
+        });
+      }
+
+      throw new Error(`Unexpected fetch call: ${url} ${init?.method ?? "GET"}`);
+    }) as typeof fetch;
+
+    render(<CoachShell privateReturnUrl="/?invite=private-access-demo&entry=private" />);
+
+    expect(await screen.findByText(/Where should we start\?/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/OPENAI_API_KEY is required for the external pilot routing layer\./i),
+    ).not.toBeInTheDocument();
+
+    restoreMatchMedia();
+  });
 });

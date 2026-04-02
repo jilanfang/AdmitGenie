@@ -15,6 +15,7 @@ import {
   hydrateDemoStateFromPersistenceRows,
   type PersistenceAdapter,
 } from "@/lib/server/persistence";
+import { getPilotCaseSeed } from "@/lib/server/pilot-access";
 
 describe("database schema exports", () => {
   it("defines the core MVP persistence tables", () => {
@@ -112,6 +113,18 @@ describe("memory persistence adapter", () => {
     expect(result.state.materials).toHaveLength(1);
     expect(result.state.weeklyBrief.whatChanged).toContain("SAT");
   });
+
+  it("initializes a blank private case with unconfirmed starter fields", async () => {
+    delete process.env.DATABASE_URL;
+
+    const adapter: PersistenceAdapter = createPersistenceAdapter();
+    const snapshot = await adapter.getCoachSnapshot("private-case-manual-check");
+
+    expect(snapshot.caseRecord.displayName).toBe("New admissions plan");
+    expect(snapshot.studentProfile.gradeLevel).toBe("Not confirmed yet");
+    expect(snapshot.profileFields.gradeLevel.status).toBe("unconfirmed");
+    expect(snapshot.weeklyBrief.whatChanged).toMatch(/blank starting point/i);
+  });
 });
 
 describe("drizzle persistence helpers", () => {
@@ -135,6 +148,15 @@ describe("drizzle persistence helpers", () => {
     expect(alpha.studentProfile.id).not.toBe(beta.studentProfile.id);
     expect(alpha.household.id).toContain("alpha");
     expect(beta.household.id).toContain("beta");
+  });
+
+  it("builds a blank durable seed for a private case workspace", () => {
+    const seed = buildDrizzleSeedPayload("private-case-manual-check");
+
+    expect(seed.household.goalsSummary).toBe("A blank private case that will be shaped through conversation.");
+    expect(seed.studentProfile.gradeLevel).toBe("Not confirmed yet");
+    expect(seed.studentProfile.firstName).toBeNull();
+    expect(seed.weeklyBrief.whatChanged).toMatch(/blank starting point/i);
   });
 
   it("keeps all seeded relationships aligned to the requested workspace", () => {
@@ -225,6 +247,25 @@ describe("drizzle persistence helpers", () => {
     expect(hydrated.household.id).toBe(DEMO_HOUSEHOLD_ID);
     expect(hydrated.studentProfile.id).toBe(DEMO_STUDENT_PROFILE_ID);
     expect(hydrated.conversation[0]).toContain("SAT update");
+  });
+
+  it("falls back to private case metadata during hydration for a blank private case", () => {
+    const seed = getPilotCaseSeed("private-case-manual-check");
+    const hydrated = hydrateDemoStateFromPersistenceRows(
+      {
+        households: [],
+        studentProfiles: [],
+        conversations: [],
+        materialItems: [],
+        profilePatches: [],
+        weeklyBriefs: [],
+      },
+      seed.caseId,
+    );
+
+    expect(hydrated.caseRecord.displayName).toBe("New admissions plan");
+    expect(hydrated.studentProfile.gradeLevel).toBe("Not confirmed yet");
+    expect(hydrated.weeklyBrief.whatChanged).toMatch(/blank starting point/i);
   });
 
 });

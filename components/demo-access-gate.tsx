@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 export function DemoAccessGate(props: { initialInviteToken?: string | null }) {
   const [accessCode, setAccessCode] = useState(props.initialInviteToken ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isStartingPlan, setIsStartingPlan] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hasAutoSubmitted = useRef(false);
 
@@ -41,6 +42,39 @@ export function DemoAccessGate(props: { initialInviteToken?: string | null }) {
     }
   };
 
+  const handleStartPlan = async () => {
+    setIsStartingPlan(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/session/access", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "start_new_plan",
+        }),
+      });
+      const payload = (await response.json()) as {
+        ok: boolean;
+        error?: string;
+        data?: {
+          returnUrl?: string;
+        };
+      };
+
+      if (!response.ok || !payload.data?.returnUrl) {
+        setError(payload.error ?? "We could not create a new plan right now.");
+        return;
+      }
+
+      window.location.assign(payload.data.returnUrl);
+    } finally {
+      setIsStartingPlan(false);
+    }
+  };
+
   useEffect(() => {
     if (hasAutoSubmitted.current || !props.initialInviteToken) {
       return;
@@ -60,6 +94,9 @@ export function DemoAccessGate(props: { initialInviteToken?: string | null }) {
         </p>
         <p className="demo-access-card__aside">
           One active case. One coach thread. No dashboard tour.
+        </p>
+        <p className="demo-access-card__aside demo-access-card__aside--secondary">
+          Need a fresh start instead? Create a private case and keep the return link.
         </p>
 
         <label className="demo-access-card__field">
@@ -82,6 +119,14 @@ export function DemoAccessGate(props: { initialInviteToken?: string | null }) {
           disabled={isSubmitting}
         >
           {isSubmitting ? "Opening..." : "Open the case"}
+        </button>
+        <button
+          className="demo-access-card__secondary"
+          type="button"
+          onClick={() => void handleStartPlan()}
+          disabled={isStartingPlan}
+        >
+          {isStartingPlan ? "Starting..." : "Start a new plan"}
         </button>
       </section>
     </main>

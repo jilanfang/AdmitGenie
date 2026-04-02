@@ -22,6 +22,7 @@ import {
 import { getPilotCaseSeed } from "@/lib/server/pilot-access";
 import {
   createInitialDemoState,
+  createBlankStarterState,
   deriveDecisionCard,
   deriveSuggestedReplies,
   type DecisionCard,
@@ -191,9 +192,10 @@ function createMemoryPersistenceAdapter(): PersistenceAdapter {
       return existing;
     }
 
+    const caseSeed = getPilotCaseSeed(key);
     const created = {
-      selectedPersonaSlug: DEFAULT_PERSONA_SLUG,
-      state: buildPersonaDemoState(DEFAULT_PERSONA_SLUG),
+      selectedPersonaSlug: caseSeed.personaSlug,
+      state: createStarterStateForCase(caseSeed),
     };
     workspaceStates.set(key, created);
     return created;
@@ -387,9 +389,10 @@ export function buildDrizzleSeedPayload(workspace?: string): {
 } {
   const caseSeed = getPilotCaseSeed(workspace);
   const defaultPersona = getPersonaBySlug(caseSeed.personaSlug);
-  const starterState = buildPersonaDemoState(caseSeed.personaSlug);
+  const starterState = createStarterStateForCase(caseSeed);
   const starterAt = new Date("2026-03-22T14:00:00.000Z");
   const ids = buildWorkspaceEntityIds(workspace);
+  const isPrivateCase = caseSeed.audience === "private";
 
   return {
     household: {
@@ -404,13 +407,15 @@ export function buildDrizzleSeedPayload(workspace?: string): {
     studentProfile: {
       id: ids.studentProfileId,
       householdId: ids.householdId,
-      firstName: defaultPersona.studentProfile.firstName,
-      gradeLevel: defaultPersona.studentProfile.gradeLevel,
-      graduationYear: defaultPersona.studentProfile.graduationYear,
-      majorDirection: defaultPersona.studentProfile.majorDirection,
+      firstName: isPrivateCase ? null : defaultPersona.studentProfile.firstName,
+      gradeLevel: isPrivateCase
+        ? starterState.profileFields.gradeLevel.value
+        : defaultPersona.studentProfile.gradeLevel,
+      graduationYear: isPrivateCase ? null : defaultPersona.studentProfile.graduationYear,
+      majorDirection: isPrivateCase ? null : defaultPersona.studentProfile.majorDirection,
       testingSummary: starterState.profileFields.testingStatus.value,
       currentHookSummary: starterState.profileFields.currentFocus.value,
-      profileConfidence: defaultPersona.studentProfile.profileConfidence,
+      profileConfidence: isPrivateCase ? null : defaultPersona.studentProfile.profileConfidence,
       createdAt: starterAt,
       updatedAt: starterAt,
     },
@@ -518,7 +523,7 @@ export function hydrateDemoStateFromPersistenceRows(
   caseId?: string,
 ): CoachSnapshot {
   const caseSeed = getPilotCaseSeed(caseId);
-  const starterState = buildPersonaDemoState(caseSeed.personaSlug);
+  const starterState = createStarterStateForCase(caseSeed);
   const sortedConversations = sortByCreatedAtDesc(rows.conversations);
   const sortedMaterials = sortByCreatedAtDesc(rows.materialItems, "submittedAt");
   const sortedPatches = sortByCreatedAtDesc(rows.profilePatches);
@@ -902,6 +907,7 @@ function snapshotFromState(
   const persona = getPersonaBySlug(personaSlug);
   const caseSeed = getPilotCaseSeed(caseId);
   const entityIds = buildWorkspaceEntityIds(caseId);
+  const isPrivateCase = caseSeed.audience === "private";
 
   return {
     caseRecord: buildCaseRecord(caseSeed.caseId, caseSeed.slug, caseSeed.displayName, caseSeed.summary, state),
@@ -912,10 +918,12 @@ function snapshotFromState(
     },
     studentProfile: {
       id: entityIds.studentProfileId,
-      firstName: persona.studentProfile.firstName,
-      gradeLevel: persona.studentProfile.gradeLevel,
-      graduationYear: persona.studentProfile.graduationYear,
-      majorDirection: persona.studentProfile.majorDirection,
+      firstName: isPrivateCase ? null : persona.studentProfile.firstName,
+      gradeLevel: isPrivateCase
+        ? state.profileFields.gradeLevel.value
+        : persona.studentProfile.gradeLevel,
+      graduationYear: isPrivateCase ? null : persona.studentProfile.graduationYear,
+      majorDirection: isPrivateCase ? null : persona.studentProfile.majorDirection,
     },
     conversation: state.conversation,
     materials: state.materials,
@@ -1082,6 +1090,7 @@ function resolveEntitySummary(rows: PersistedCoreRows, caseId?: string): {
   const household = rows.households?.[0];
   const studentProfile = rows.studentProfiles?.[0];
   const fallbackSeed = getPilotCaseSeed(caseId);
+  const starterState = createStarterStateForCase(fallbackSeed);
 
   return {
     caseRecord: buildCaseRecord(
@@ -1114,7 +1123,7 @@ function resolveEntitySummary(rows: PersistedCoreRows, caseId?: string): {
           graduationYear: studentProfile.graduationYear ?? null,
           majorDirection: studentProfile.majorDirection ?? null,
         }
-      : defaultCoachStudentProfile(),
+      : defaultCoachStudentProfile(fallbackSeed, starterState, caseId),
   };
 }
 
@@ -1161,13 +1170,19 @@ function describeLatestStatus(state: DemoState): string {
   return state.profileFields.currentFocus.value;
 }
 
-function defaultCoachStudentProfile(): CoachStudentProfile {
-  const seed = buildDrizzleSeedPayload();
+function defaultCoachStudentProfile(
+  fallbackSeed: ReturnType<typeof getPilotCaseSeed> = getPilotCaseSeed(),
+  starterState: DemoState = createStarterStateForCase(fallbackSeed),
+  caseId?: string,
+): CoachStudentProfile {
+  const workspace =
+    caseId && caseId !== getPilotCaseSeed().caseId ? caseId : undefined;
+  const seed = buildDrizzleSeedPayload(workspace);
 
   return {
     id: seed.studentProfile.id,
     firstName: seed.studentProfile.firstName ?? null,
-    gradeLevel: seed.studentProfile.gradeLevel,
+    gradeLevel: starterState.profileFields.gradeLevel.value,
     graduationYear: seed.studentProfile.graduationYear ?? null,
     majorDirection: seed.studentProfile.majorDirection ?? null,
   };
@@ -1182,6 +1197,14 @@ function getDemoPersonaConfig(
     selectedSlug,
     options: listPersonaOptions(),
   };
+}
+
+function createStarterStateForCase(caseSeed: ReturnType<typeof getPilotCaseSeed>): DemoState {
+  if (caseSeed.audience === "private") {
+    return createBlankStarterState();
+  }
+
+  return buildPersonaDemoState(caseSeed.personaSlug);
 }
 
 function resolveWorkspaceKey(workspace?: string): string {

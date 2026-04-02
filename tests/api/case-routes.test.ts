@@ -46,6 +46,80 @@ describe("case api routes", () => {
     expect(cookie).toMatch(/admitgenie-pilot-session=/);
   });
 
+  it("creates a blank private case and returns a private return url", async () => {
+    const response = await postSessionAccess(
+      new Request("http://localhost/api/session/access", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "start_new_plan",
+        }),
+      }),
+    );
+    const json = (await response.json()) as {
+      ok: boolean;
+      data: {
+        authorized: boolean;
+        caseId: string;
+        returnUrl: string;
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(json.data.authorized).toBe(true);
+    expect(json.data.caseId).toMatch(/^private-case-/);
+    expect(json.data.returnUrl).toMatch(/^\/\?invite=private-access-/);
+    expect(json.data.returnUrl).toContain("&entry=private");
+    expect(response.headers.get("set-cookie")).toMatch(/admitgenie-pilot-session=/);
+  });
+
+  it("returns a blank starter case state for a newly created private case", async () => {
+    const sessionResponse = await postSessionAccess(
+      new Request("http://localhost/api/session/access", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "start_new_plan",
+        }),
+      }),
+    );
+    const cookie = sessionResponse.headers.get("set-cookie");
+    const response = await getCaseState(
+      new Request("http://localhost/api/case/state", {
+        headers: cookie ? { cookie } : {},
+      }),
+    );
+    const json = (await response.json()) as {
+      ok: boolean;
+      data: {
+        state: {
+          caseRecord: {
+            id: string;
+            displayName: string;
+          };
+          studentProfile: {
+            gradeLevel: string;
+          };
+          weeklyBrief: {
+            whatChanged: string;
+          };
+        };
+      };
+    };
+
+    expect(response.status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(json.data.state.caseRecord.id).toMatch(/^private-case-/);
+    expect(json.data.state.caseRecord.displayName).toBe("New admissions plan");
+    expect(json.data.state.studentProfile.gradeLevel).toBe("Not confirmed yet");
+    expect(json.data.state.weeklyBrief.whatChanged).toMatch(/blank starting point/i);
+  });
+
   it("rejects case state reads without a pilot session", async () => {
     const response = await getCaseState(new Request("http://localhost/api/case/state"));
     const json = (await response.json()) as {

@@ -74,6 +74,57 @@ function createStarterSnapshot(): CoachSnapshot {
   return createSnapshotFromState(createInitialDemoState());
 }
 
+function createPrivateStarterSnapshot(): CoachSnapshot {
+  return withUiState({
+    caseRecord: {
+      id: "private-case-demo",
+      slug: "private-case-demo",
+      displayName: "New admissions plan",
+      summary: "A blank private case that will be shaped through conversation.",
+      latestStatus: "The case is brand new and ready for the first real input.",
+      oneNextMove: "Share your grade, goals, or biggest uncertainty.",
+    },
+    household: {
+      id: "workspace-private-case-demo-household",
+      timezone: "America/Los_Angeles",
+      goalsSummary: "Blank private case",
+    },
+    studentProfile: {
+      id: "workspace-private-case-demo-student",
+      firstName: null,
+      gradeLevel: "Not confirmed yet",
+      graduationYear: null,
+      majorDirection: null,
+    },
+    ...createInitialDemoState(),
+    profileFields: {
+      ...createInitialDemoState().profileFields,
+      gradeLevel: {
+        label: "Grade",
+        value: "Not confirmed yet",
+        status: "unconfirmed",
+      },
+    },
+    weeklyBrief: {
+      whatChanged: "This case starts from a blank starting point with no confirmed profile facts yet.",
+      whatMatters:
+        "Share the first real context so the coach can turn this blank case into a working plan.",
+      topActions: [
+        "Tell the coach your current grade.",
+        "Share your biggest admissions concern.",
+        "Paste a school list or recent update if you already have one.",
+      ],
+      risks: [
+        "If the first facts stay vague, the advice will stay broad.",
+      ],
+      whyThisAdvice:
+        "The case is intentionally blank, so the fastest way to value is to lock one or two core facts first.",
+    },
+    decisionCard: null,
+    suggestedReplies: deriveSuggestedReplies(createInitialDemoState()),
+  });
+}
+
 function createReadinessStatus(): CaseReadinessStatus {
   return {
     persistenceKind: "drizzle",
@@ -234,6 +285,21 @@ describe("CoachShell", () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith("/api/case/state");
     });
+  });
+
+  it("shows a private return link in the case rail for a user-created case", async () => {
+    installCaseFetchMock(createPrivateStarterSnapshot());
+    window.history.replaceState({}, "", "/?invite=private-access-demo&entry=private");
+
+    render(<CoachShell />);
+
+    expect(await screen.findByText(/Where should we start\?/i)).toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByRole("button", { name: /open case details/i }));
+
+    expect(await screen.findByText(/Private return link/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(/\/\?invite=private-access-demo&entry=private/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Copy link/i })).toBeInTheDocument();
   });
 
   it("opens the compact case rail on smaller screens", async () => {

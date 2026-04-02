@@ -8,8 +8,9 @@ import {
   pilotInvites,
   pilotSessions,
 } from "@/db/schema";
+import { DEFAULT_PERSONA_SLUG } from "@/lib/domain/personas";
 
-export type PilotAudience = "family" | "counselor";
+export type PilotAudience = "family" | "counselor" | "private";
 
 export type PilotCaseSeed = {
   caseId: string;
@@ -35,8 +36,15 @@ export type PilotSessionState = {
 
 const PILOT_SESSION_COOKIE = "admitgenie-pilot-session";
 const MAX_SESSION_REQUESTS = 120;
+const PRIVATE_CASE_DISPLAY_NAME = "New admissions plan";
+const PRIVATE_CASE_SUMMARY = "A blank private case that will be shaped through conversation.";
+const PRIVATE_CASE_INVITE_LABEL = "Private return link";
+const PRIVATE_CASE_ID_PREFIX = "private-case-";
+const PRIVATE_INVITE_PREFIX = "private-access-";
 
 const memorySessions = new Map<string, PilotSessionState>();
+const memoryPrivateCases = new Map<string, PilotCaseSeed>();
+const memoryPrivateInvites = new Map<string, PilotCaseSeed>();
 
 export function getPilotSessionCookieName(): string {
   return PILOT_SESSION_COOKIE;
@@ -101,7 +109,36 @@ export function listPilotCaseSeeds(): PilotCaseSeed[] {
   ];
 }
 
+function createPrivateCaseSeed(caseId: string, inviteToken?: string): PilotCaseSeed {
+  const suffix = caseId.startsWith(PRIVATE_CASE_ID_PREFIX)
+    ? caseId.slice(PRIVATE_CASE_ID_PREFIX.length)
+    : caseId;
+
+  return {
+    caseId,
+    slug: caseId,
+    audience: "private",
+    displayName: PRIVATE_CASE_DISPLAY_NAME,
+    summary: PRIVATE_CASE_SUMMARY,
+    personaSlug: DEFAULT_PERSONA_SLUG,
+    inviteLabel: PRIVATE_CASE_INVITE_LABEL,
+    inviteToken: inviteToken ?? `${PRIVATE_INVITE_PREFIX}${suffix}`,
+  };
+}
+
 export function getPilotCaseSeed(caseId?: string): PilotCaseSeed {
+  if (caseId) {
+    const privateSeed = memoryPrivateCases.get(caseId);
+
+    if (privateSeed) {
+      return privateSeed;
+    }
+
+    if (caseId.startsWith(PRIVATE_CASE_ID_PREFIX)) {
+      return createPrivateCaseSeed(caseId);
+    }
+  }
+
   const seeds = listPilotCaseSeeds();
 
   if (!caseId) {
@@ -114,7 +151,82 @@ export function getPilotCaseSeed(caseId?: string): PilotCaseSeed {
 export function getPilotCaseSeedByInviteToken(inviteToken: string): PilotCaseSeed | null {
   const trimmed = inviteToken.trim();
 
-  return listPilotCaseSeeds().find((seed) => seed.inviteToken === trimmed) ?? null;
+  if (trimmed.startsWith(PRIVATE_INVITE_PREFIX)) {
+    const suffix = trimmed.slice(PRIVATE_INVITE_PREFIX.length);
+    return createPrivateCaseSeed(`${PRIVATE_CASE_ID_PREFIX}${suffix}`, trimmed);
+  }
+
+  return (
+    memoryPrivateInvites.get(trimmed) ??
+    listPilotCaseSeeds().find((seed) => seed.inviteToken === trimmed) ??
+    null
+  );
+}
+
+export async function createPrivatePlanAccess(): Promise<{
+  sessionId: string;
+  caseId: string;
+  inviteToken: string;
+}> {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const suffix = randomUUID().replace(/-/g, "").slice(0, 12);
+  const caseId = `${PRIVATE_CASE_ID_PREFIX}${suffix}`;
+  const inviteToken = `${PRIVATE_INVITE_PREFIX}${suffix}`;
+  const seed = createPrivateCaseSeed(caseId, inviteToken);
+
+  if (!databaseUrl) {
+    const sessionId = randomUUID();
+    memoryPrivateCases.set(caseId, seed);
+    memoryPrivateInvites.set(inviteToken, seed);
+    memorySessions.set(sessionId, {
+      id: sessionId,
+      caseId,
+      requestCount: 0,
+    });
+
+    return {
+      sessionId,
+      caseId,
+      inviteToken,
+    };
+  }
+
+  const db = createDatabaseConnection(databaseUrl);
+  await ensurePilotSeeds(databaseUrl);
+
+  await db.insert(pilotCases).values({
+    id: seed.caseId,
+    slug: seed.slug,
+    audience: seed.audience,
+    displayName: seed.displayName,
+    summary: seed.summary,
+    personaSlug: seed.personaSlug,
+  });
+
+  const [invite] = await db
+    .insert(pilotInvites)
+    .values({
+      caseId: seed.caseId,
+      label: seed.inviteLabel,
+      token: seed.inviteToken,
+      status: "active",
+    })
+    .returning();
+
+  const [session] = await db
+    .insert(pilotSessions)
+    .values({
+      caseId: seed.caseId,
+      inviteId: invite.id,
+      requestCount: 0,
+    })
+    .returning();
+
+  return {
+    sessionId: session.id,
+    caseId: seed.caseId,
+    inviteToken: seed.inviteToken,
+  };
 }
 
 export async function grantPilotAccess(inviteToken: string): Promise<PilotInviteGrant | null> {

@@ -41,7 +41,7 @@ const DEFAULT_COMPOSER_STATE: MaterialComposerState = {
   error: null,
 };
 
-export function CoachShell() {
+export function CoachShell(props: { privateReturnUrl?: string | null }) {
   const [state, setState] = useState<CoachSnapshot | null>(null);
   const [readiness, setReadiness] = useState<CaseReadinessStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,6 +58,7 @@ export function CoachShell() {
     useState<MaterialComposerState>(DEFAULT_COMPOSER_STATE);
   const [decisionSelection, setDecisionSelection] = useState<string[]>([]);
   const [uiError, setUiError] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -282,6 +283,7 @@ export function CoachShell() {
   const latestDecisionCard = state.decisionCard;
   const suggestedReplies = state.suggestedReplies;
   const isCasePanelVisible = isDesktopLayout || isCasePanelOpen;
+  const privateReturnUrl = resolvePrivateReturnUrl(props.privateReturnUrl);
   const isStarterStage =
     state.conversation.length <= 2 &&
     suggestedReplies.length > 0 &&
@@ -332,6 +334,26 @@ export function CoachShell() {
 
   const handleSuggestedReply = async (message: string) => {
     await sendConversation(message);
+  };
+
+  const handleCopyPrivateLink = async () => {
+    if (!privateReturnUrl || typeof window === "undefined") {
+      return;
+    }
+
+    const absoluteUrl = `${window.location.origin}${privateReturnUrl}`;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(absoluteUrl);
+        setCopyFeedback("Copied");
+        return;
+      }
+
+      setCopyFeedback("Copy manually");
+    } catch {
+      setCopyFeedback("Copy manually");
+    }
   };
 
   return (
@@ -395,6 +417,31 @@ export function CoachShell() {
                 <strong>One next move</strong>
                 <p>{state.caseRecord.oneNextMove}</p>
               </div>
+
+              {privateReturnUrl ? (
+                <div className="chat-side-panel__note">
+                  <strong>Private return link</strong>
+                  <p>Keep this link if you want to come back to the same case later.</p>
+                  <div className="chat-side-panel__link-row">
+                    <input
+                      aria-label="Private return link"
+                      className="chat-side-panel__link-input"
+                      readOnly
+                      value={privateReturnUrl}
+                    />
+                    <button
+                      className="chat-side-panel__link-button"
+                      type="button"
+                      onClick={() => void handleCopyPrivateLink()}
+                    >
+                      {copyFeedback === "Copied" ? "Copied" : "Copy link"}
+                    </button>
+                  </div>
+                  {copyFeedback === "Copy manually" ? (
+                    <small>Clipboard access is not available here. Copy the link from the field.</small>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="chat-side-panel__meta">
                 <span>{state.studentProfile.firstName ?? state.caseRecord.displayName}</span>
@@ -727,6 +774,26 @@ function handleCaseRouteFailure(status: number, error?: string) {
   }
 
   throw new Error(error ?? "Case request failed.");
+}
+
+function resolvePrivateReturnUrl(explicitUrl?: string | null): string | null {
+  if (explicitUrl) {
+    return explicitUrl;
+  }
+
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const inviteToken = params.get("invite");
+  const entry = params.get("entry");
+
+  if (!inviteToken || entry !== "private") {
+    return null;
+  }
+
+  return `/?invite=${encodeURIComponent(inviteToken)}&entry=private`;
 }
 
 function formatConversationMessage(message: string) {

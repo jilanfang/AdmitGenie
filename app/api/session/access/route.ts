@@ -2,12 +2,36 @@ import {
   buildPilotSessionCookie,
   grantPilotAccess,
 } from "@/lib/server/pilot-access";
+import { startNewPlanSession } from "@/lib/server/start-plan";
 
 export async function POST(request: Request) {
   const payload = (await readJson(request)) as {
     inviteToken?: string;
     accessCode?: string;
+    action?: string;
   } | null;
+
+  if (payload?.action === "start_new_plan") {
+    const grant = await startNewPlanSession();
+
+    return Response.json(
+      {
+        ok: true,
+        data: {
+          authorized: true,
+          caseId: grant.caseId,
+          returnUrl: grant.returnUrl,
+        },
+      },
+      {
+        status: 200,
+        headers: {
+          "set-cookie": buildPilotSessionCookie(grant.sessionId),
+        },
+      },
+    );
+  }
+
   const inviteToken = payload?.inviteToken?.trim() || payload?.accessCode?.trim() || "";
 
   if (inviteToken.length === 0) {

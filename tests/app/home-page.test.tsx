@@ -33,6 +33,7 @@ describe("HomePage", () => {
     expect(screen.getByText(/Open your active case\./i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Pilot invite/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Open the case/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Start a new plan/i })).toBeInTheDocument();
   });
 
   it("renders the coach shell after pilot access is granted", async () => {

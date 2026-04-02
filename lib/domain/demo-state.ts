@@ -155,6 +155,62 @@ export function createInitialDemoState(): DemoState {
   };
 }
 
+export function createBlankStarterState(): DemoState {
+  return {
+    conversation: [
+      "You are starting from a blank private case, which is good. We do not need a giant intake form. Give me the first real facts and I will turn them into a working plan.",
+      "Start with any one of these: your current grade, what kind of colleges you are aiming at, what feels most unclear, or a score, school list, or update you already have.",
+    ],
+    materials: [],
+    patches: [],
+    pendingPatch: null,
+    materialAnalysis: [],
+    profileFields: {
+      gradeLevel: {
+        label: "Grade",
+        value: "Not confirmed yet",
+        status: "unconfirmed",
+      },
+      testingStatus: {
+        label: "Testing",
+        value: "No testing context shared yet",
+        status: "unconfirmed",
+      },
+      schoolList: {
+        label: "School list",
+        value: "No school list shared yet",
+        status: "unconfirmed",
+      },
+      applicationTiming: {
+        label: "Application timing",
+        value: "No deadline strategy confirmed yet",
+        status: "unconfirmed",
+      },
+      currentFocus: {
+        label: "Current focus",
+        value: "Turn the first real facts into a usable admissions plan",
+        status: "inferred",
+      },
+    },
+    weeklyBrief: {
+      whatChanged: "This case starts from a blank starting point with no confirmed profile facts yet.",
+      whatMatters:
+        "The next gain comes from locking one or two real facts so the coach can stop speaking broadly and start guiding concretely.",
+      topActions: [
+        "Tell the coach your current grade.",
+        "Share the main goal or uncertainty right now.",
+        "Paste a score, school list, or recent update if you already have one.",
+      ],
+      risks: [
+        "If the first facts stay vague, the next advice will stay broad.",
+        "If no school list or testing context is shared, prioritization will remain provisional.",
+      ],
+      whyThisAdvice:
+        "A blank case is useful only if it turns quickly into a working profile, so the first step is to confirm a small set of high-leverage facts.",
+    },
+  };
+}
+
 export function submitMaterialDraft(
   state: DemoState,
   draft: MaterialDraft,

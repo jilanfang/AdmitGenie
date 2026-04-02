@@ -1,49 +1,43 @@
 <!-- task-archive metadata -->
-<!-- snapshot_id: 20260328-003556-admitgenie-ai-native-desktop-ui-checkpoint -->
+<!-- snapshot_id: 20260329-221625-admitgenie-blank-user-entry-design -->
 <!-- project_path: /Users/jilanfang/ai college-apply-helper -->
-<!-- saved_at: 2026-03-28 00:35 CST -->
+<!-- saved_at: 2026-03-29 22:16 CST -->
 
 # Findings & Decisions
 
 ## Requirements
-- Preserve the AI-native, conversation-first product thesis.
-- Keep the core MVP demoable and easy for young families to use without a learning curve.
-- Keep structured confirmations in chat, not as separate dashboard flows.
-- Keep desktop web, especially Mac, feeling intentional and calm.
-- Keep docs/checkpoints trustworthy as active source-of-truth artifacts.
-- Do not imply real model integration where it does not yet exist.
+- A real new user must be able to create a fresh case without already holding an invite.
+- The first version should not introduce account creation.
+- The created case should feel blank and user-owned, not like a seeded demo case.
+- The user must receive an explicit private return link.
+- The existing invite-based pilot flow must keep working.
 
 ## Scope Notes
-- This checkpoint is UI-convergence-focused rather than architecture-focused.
-- The main task was interaction and visual simplification, not feature expansion.
-- Browser QA was part of the work, not an optional afterthought.
-- The working tree is intentionally still dirty because the checkpoint spans multiple related product, docs, and UI iterations.
+- This checkpoint is product/design-focused, not implementation-complete.
+- The first version is a no-account blank-user entry path, not a full auth or dashboard system.
+- The goal is one fresh case per click, not multi-case management.
+- The current live POC remains the underlying production base.
 
 ## Research Findings
-- The strongest remaining quality issues were about desktop composition, not missing features.
-- On large screens, opening coach copy can easily become too narrow and feel like a skinny title column unless explicitly widened.
-- Side-panel layering works better with a very light scrim and clear sheet separation than with strong blur over the whole app.
-- Keyboard focus, hover, and pressed states matter a lot for perceived Mac web quality even in a chat-first product.
-- Dev-only local overlays distort design review and should be hidden during browser QA.
-- The product now reads much more coherently as one conversation surface, but any future additions should still be forced through the same “chat first, cards only when necessary” principle.
+- The current live home page still routes unauthenticated users into an invite gate rather than a new-case create action.
+- The current persistence seed path creates persona-backed starter cases with prefilled profile and coach history, so it is not a true blank-user experience.
+- The existing product shell and session model are already good enough to host a blank-user entry path without introducing a separate onboarding app.
+- The smallest viable path is to extend the current access surface and reuse the current `/?invite=<token>` return-link pattern.
 
 ## Technical Decisions
 | Decision | Rationale |
 |----------|-----------|
-| Keep the UI chat-first and treat cards as in-chat confirmation only | This matches founder direction and reduces cognitive load for families and students. |
-| Optimize this phase for desktop/Mac web feel | Current review priorities favored PC web over mobile polish. |
-| Use real browser QA to drive the last-mile changes | The important issues were visual density and rhythm, which were clearer in-browser than in static code review. |
-| Keep the right panel as the only visible exception for low-frequency controls | This preserves operability without reintroducing a dashboard feel. |
-| Hide dev-only local overlays during design QA | They corrupt perception of actual product quality in local review. |
+| Ship a formal user-facing blank-user entry, not an internal testing backdoor | Matches the user’s product goal. |
+| Use no-account creation first | Fastest way to unlock a real first-run path in the current architecture. |
+| Use one-click `Start a new plan` | Keeps first touch friction low. |
+| Keep the new case blank but not dead-empty | A coach opening plus suggested starters is better than an empty screen. |
+| Return link should be explicit and copyable | No-account users need a reliable way back. |
+| Reuse the current home access page instead of adding a separate `/start` route first | Smallest viable change with least surface churn. |
 
 ## Issues / Blockers
-- None.
-- Working tree is not clean because this checkpoint intentionally spans continuing UI, docs, and domain work.
+- No blocker; the design direction is clear.
+- Implementation has not started yet.
 
 ## Next Actions
-- If continuing design work, keep the scope narrow:
-  - first-screen rhythm
-  - composer weight on laptop screens
-  - side-panel density
-- If switching back to implementation or product work, keep the current interaction principle as the source of truth.
-- Before shipping or committing, decide how to group the current modified files into a sensible boundary.
+- Finish the remaining design sections for testing, risks, and strict v1 boundaries.
+- Then create an implementation plan and start coding the blank-user entry path.

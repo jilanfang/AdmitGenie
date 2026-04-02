@@ -12,6 +12,7 @@ External POC deployment requires:
 - Neon Postgres database
 - `DATABASE_URL` configured in Vercel
 - `OPENAI_API_KEY` configured in Vercel
+- optional `OPENAI_BASE_URL` configured in Vercel if using an OpenAI-compatible gateway
 - pilot invite tokens configured in Vercel
 - optional Blob token if you want file references later
 
@@ -32,6 +33,7 @@ Set in Vercel:
 ```bash
 DATABASE_URL=postgresql://username:password@hostname:5432/admitgenie
 OPENAI_API_KEY=sk-...
+OPENAI_BASE_URL=https://api.vectorengine.ai
 OPENAI_ROUTING_ENABLED=true
 OPENAI_CLASSIFIER_MODEL=gpt-4o-mini
 OPENAI_RESPONSE_MODEL=gpt-4o
@@ -54,6 +56,7 @@ pnpm poc:smoke
 1. Create a Neon database.
 2. Copy the connection string into Vercel as `DATABASE_URL`.
 3. Add the OpenAI and invite-token environment variables.
+   - If you are using an OpenAI-compatible provider instead of the default OpenAI endpoint, also set `OPENAI_BASE_URL`.
 4. From the repo, run:
 
 ```bash

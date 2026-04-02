@@ -1,68 +1,64 @@
 <!-- task-archive metadata -->
-<!-- snapshot_id: 20260328-003556-admitgenie-ai-native-desktop-ui-checkpoint -->
+<!-- snapshot_id: 20260329-221625-admitgenie-blank-user-entry-design -->
 <!-- project_path: /Users/jilanfang/ai college-apply-helper -->
-<!-- saved_at: 2026-03-28 00:35 CST -->
+<!-- saved_at: 2026-03-29 22:16 CST -->
 
 # Progress Log
 
 ## Checkpoint Summary
-- Snapshot ID: 20260328-003556-admitgenie-ai-native-desktop-ui-checkpoint
-- Saved At: 2026-03-28 00:35 CST
+- Snapshot ID: 20260329-221625-admitgenie-blank-user-entry-design
+- Saved At: 2026-03-29 22:16 CST
 - Project Path: /Users/jilanfang/ai college-apply-helper
-- Current Phase: checkpoint after multiple rounds of AI-native UI convergence, desktop-first browser QA, and final polishing of the Mac/PC web experience.
+- Current Phase: blank-user entry is in design mode; core product choices are locked, but implementation has not started.
 
 ## Actions Completed
-- Converged the main UI toward a much more AI-native, conversation-first shell.
-- Moved low-frequency controls behind a hidden side panel and kept confirmation inside chat via cards.
-- Rewrote access gate and coach copy to sound more like a private admissions counselor.
-- Weakened heavy UI framing across composer, suggestions, user messages, inserts, and decision surfaces.
-- Tuned the desktop/Mac web feel with calmer spacing, better interaction states, and improved side-panel layering.
-- Ran real browser QA on `http://127.0.0.1:3101` and used the screenshots to correct live visual issues.
-- Verified the current workspace with fresh `pnpm test` and `pnpm build`.
+- Restored the latest project checkpoint and reviewed current product constraints.
+- Confirmed the live product still uses invite-based access and does not expose a true blank-user create flow.
+- Confirmed the current persistence seed path hydrates a persona-backed starter case instead of a blank case.
+- Locked the first implementation direction with the user:
+  - user-facing formal entry
+  - no-account path first
+  - one-click `Start a new plan`
+  - blank case with coach opening plus suggested starters
+  - copyable private return link
+- Chose the minimal architecture path:
+  - extend the current access card rather than add a separate `/start` route
+  - add one backend start-session endpoint
+  - reuse the current session and token-return model
 
 ## Next Actions
-- Review the current desktop UI in browser and decide whether any more polish is worth doing.
-- If continuing UI work, focus only on first-screen rhythm, composer weight on laptop screens, and side-panel density.
-- Before shipping or handing off, decide how to split or commit the broader modified file set.
-- Keep the simplified chat-first interaction principle as the source of truth for any future UI changes.
+- Finish the remaining design sections for:
+  - testing strategy
+  - implementation risks
+  - strict v1 scope boundaries
+- Then turn the design into an implementation plan and start coding.
 
 ## Files Created/Modified
-- app/globals.css
-- components/coach-shell.tsx
+- app/page.tsx
 - components/demo-access-gate.tsx
-- tests/components/coach-shell.test.tsx
-- tests/app/home-page.test.tsx
-- docs/product/onboarding-v1.md
-- docs/product/user-workflows.md
-- docs/product/canonical-product-blueprint-zh.md
-- docs/product/founder-priority-user-journeys-zh.md
-- lib/domain/demo-contracts.ts
-- lib/domain/demo-state.ts
+- components/coach-shell.tsx
 - lib/server/persistence.ts
-- tests/api/demo-routes.test.ts
-- tests/domain/demo-state.test.ts
+- docs/product/onboarding-v1.md
 - AGENTS.md
-- .gitignore
-- app/icon.svg
+- SKILLS.md
 - task_plan.md
 - progress.md
 - findings.md
 - .task-archive/current.md
-- .task-archive/snapshots/20260328-003556-admitgenie-ai-native-desktop-ui-checkpoint.md
+- .task-archive/snapshots/20260329-221625-admitgenie-blank-user-entry-design.md
 
 ## Verification Results
 | Check | Status | Details |
 |-------|--------|---------|
-| `pnpm test` | passed | 84/84 tests passed on the current workspace on 2026-03-28. |
-| `pnpm build` | passed | Production build succeeded with `next build --webpack` on 2026-03-28. |
-| Local browser QA | passed | Verified desktop access gate, main chat view, and side panel using Playwright against `http://127.0.0.1:3101`. |
-| Desktop visual polish | passed | Final browser review confirmed improved opening rhythm, calmer side-panel layering, and cleaner local demo presentation. |
+| Current entry-path inspection | passed | Verified the live product currently requires invite access and does not expose blank-user case creation. |
+| Persistence inspection | passed | Verified the current seed path is persona-backed rather than blank. |
+| Product direction lock | passed | Core v1 design choices were explicitly selected with the user during brainstorming. |
 
 ## Reboot Check
 | Question | Answer |
 |----------|--------|
-| Where am I? | At a browser-verified checkpoint after multiple rounds of AI-native desktop UI convergence and Mac/PC polish. |
-| Where am I going? | Either toward a very small final desktop polish pass or back into product/implementation work on top of the stabilized interaction model. |
-| What's the goal? | Keep AdmitGenie feeling like a private admissions counselor conversation instead of a multi-panel system. |
-| What have I learned? | The last 10% of this UI work came from real browser QA: desktop spacing, opening rhythm, side-panel layering, and dev-only local noise mattered more than more features. |
-| What have I done? | Simplified the shell, tightened the copy, improved the desktop interaction feel, validated it in browser, and re-ran tests/build. |
+| Where am I? | At a design checkpoint for blank-user entry on top of the existing live POC. |
+| Where am I going? | Finish the design, then convert it into an implementation plan and code change. |
+| What's the goal? | Let a true new user create a fresh case without an existing invite and still get a private return path. |
+| What have I learned? | The current product only feels “non-demo” once inside; the entry path and seeded case still prevent a truly blank-user experience. |
+| What have I done? | Inspected the current live entry and seed path, then locked the product direction for a no-account blank-user create flow. |

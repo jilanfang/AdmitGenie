@@ -20,6 +20,7 @@ describe("ai routing", () => {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     OPENAI_CLASSIFIER_MODEL: process.env.OPENAI_CLASSIFIER_MODEL,
     OPENAI_RESPONSE_MODEL: process.env.OPENAI_RESPONSE_MODEL,
+    OPENAI_BASE_URL: process.env.OPENAI_BASE_URL,
   };
   const originalFetch = global.fetch;
 
@@ -28,6 +29,7 @@ describe("ai routing", () => {
     process.env.OPENAI_API_KEY = "test-key";
     process.env.OPENAI_CLASSIFIER_MODEL = "gpt-4o-mini";
     process.env.OPENAI_RESPONSE_MODEL = "gpt-4o";
+    delete process.env.OPENAI_BASE_URL;
   });
 
   afterEach(() => {
@@ -36,6 +38,41 @@ describe("ai routing", () => {
     process.env.OPENAI_API_KEY = originalEnv.OPENAI_API_KEY;
     process.env.OPENAI_CLASSIFIER_MODEL = originalEnv.OPENAI_CLASSIFIER_MODEL;
     process.env.OPENAI_RESPONSE_MODEL = originalEnv.OPENAI_RESPONSE_MODEL;
+    process.env.OPENAI_BASE_URL = originalEnv.OPENAI_BASE_URL;
+  });
+
+  it("uses OPENAI_BASE_URL when configured for routing requests", async () => {
+    process.env.OPENAI_BASE_URL = "https://api.vectorengine.ai";
+
+    global.fetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          output_text: JSON.stringify({
+            inputKind: "ask_next_step",
+            journeyStage: "starter_clarity",
+            responseMode: "chat_only",
+            writePermission: "none",
+            candidateCardType: "none",
+            candidateAction: "none",
+            confidence: 0.86,
+            reasonShort: "Family is asking what to do next.",
+          }),
+        }),
+      ),
+    ) as typeof fetch;
+
+    await routeConversationInput({
+      state: createInitialDemoState(),
+      message: "What should we do next for this month?",
+      personaSlug: "strategic-stem-striver",
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.vectorengine.ai/v1/responses",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
   });
 
   it("forces summarize_no_write when classifier returns unknown", async () => {

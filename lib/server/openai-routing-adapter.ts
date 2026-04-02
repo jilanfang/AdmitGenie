@@ -1,4 +1,5 @@
 const DEFAULT_TIMEOUT_MS = 10_000;
+const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com";
 
 export type OpenAIAdapterResult<T> =
   | { ok: true; value: T }
@@ -31,13 +32,14 @@ async function requestStructuredJson(
   input: string,
 ): Promise<OpenAIAdapterResult<unknown>> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const baseUrl = getOpenAIBaseUrl();
 
   if (!apiKey) {
     return { ok: false, reason: "adapter_missing_api_key" };
   }
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetch(`${baseUrl}/v1/responses`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -69,6 +71,10 @@ async function requestStructuredJson(
 
     return { ok: false, reason: "adapter_network_error" };
   }
+}
+
+function getOpenAIBaseUrl() {
+  return process.env.OPENAI_BASE_URL?.trim().replace(/\/+$/, "") || DEFAULT_OPENAI_BASE_URL;
 }
 
 function parseJsonText(value: unknown): unknown {

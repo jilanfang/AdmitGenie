@@ -1,100 +1,90 @@
 <!-- task-archive metadata -->
-<!-- snapshot_id: 20260328-003556-admitgenie-ai-native-desktop-ui-checkpoint -->
+<!-- snapshot_id: 20260329-221625-admitgenie-blank-user-entry-design -->
 <!-- project_path: /Users/jilanfang/ai college-apply-helper -->
-<!-- saved_at: 2026-03-28 00:35 CST -->
+<!-- saved_at: 2026-03-29 22:16 CST -->
 
-# Task Plan: admitgenie-ai-native-desktop-ui-checkpoint
+# Task Plan: admitgenie-blank-user-entry-design
 
 ## Goal
-Push AdmitGenie toward an AI-native, conversation-first desktop experience that feels like a private admissions counselor rather than a multi-panel demo system.
+Add a formal blank-user entry path so a real new user can create a fresh case without an existing invite, land directly inside the coach shell, and receive a private return link.
 
 ## Success Criteria
-- Main UI is visually centered on the conversation, with low-frequency controls hidden or visually subordinate.
-- Access gate, coach shell, suggestions, decision cards, and inserts share one coherent desktop visual language.
-- Desktop and Mac web experience feels intentional, quiet, and readable instead of mobile-first or SaaS-dashboard-like.
-- Key demo flows still work after the UI cleanup.
-- The next thread can resume from a clear checkpoint without re-discovering context.
+- A new user can click `Start a new plan` from the current home access surface.
+- The backend creates a brand-new blank case instead of routing into a seeded pilot case.
+- The created case opens inside the existing coach shell with:
+  - one coach opening message
+  - 2 to 3 suggested starter prompts
+  - a copyable private return link
+- The existing invite-based pilot flow still works unchanged.
+- The new thread can resume implementation from the design decisions already locked.
 
 ## Scope
-- Chat-first shell hierarchy and desktop layout
-- Access gate tone and visual alignment
-- Composer, suggestions, decision cards, inserts, and side-panel polish
-- Product docs aligned to the simplified interaction model
-- No real LLM integration and no major architecture rewrite
+- Home access surface changes
+- One new backend start-session endpoint
+- Blank case creation path in current drizzle persistence model
+- Reuse of current invite/session return-link pattern
+- No account system, no email/phone auth, no workspace model, no multi-case dashboard
 
 ## Current Phase
-Checkpoint after multiple rounds of AI-native UI convergence, desktop-first browser QA, and final polishing of the Mac/PC web experience.
+Design phase. Product direction is locked for a no-account blank-user entry path, but implementation has not started.
 
 ## Completed Work
-- Rewrote the main shell toward a stronger chat-first information hierarchy with low-frequency controls behind a hidden side panel.
-- Updated access gate and coach copy to sound more like a private admissions counselor and less like a demo/system.
-- Added and integrated `suggestedReplies` while keeping `decisionCard` as the in-chat structured confirmation surface.
-- Reduced visual card/dashboard noise across conversation messages, inserts, composer, and suggested replies.
-- Tuned desktop/Mac presentation:
-  - wider shell rhythm
-  - calmer opening hierarchy
-  - lighter floating controls
-  - clearer focus, hover, and pressed states
-  - improved side-panel layering
-- Hid dev-only local UI noise from the browser demo.
-- Verified the current state with fresh `pnpm test`, `pnpm build`, and real browser QA against `http://127.0.0.1:3101`.
+- Confirmed the current production entry is invite-based and not a true blank-user path.
+- Confirmed the current case seed path hydrates from a persona-backed starter state rather than a blank state.
+- Locked product choices for the first implementation:
+  - formal user entry, not internal-only tooling
+  - no-account version first
+  - one-click `Start a new plan`
+  - blank case with coach opening + suggested starters
+  - copyable private return link
+- Chose the minimal architecture direction:
+  - reuse the current home access surface
+  - add `Start a new plan` to the current access card
+  - add one backend start-session endpoint
+  - reuse the current token/session pattern instead of introducing auth
 
 ## Remaining Work
-- Human-review the current desktop UI and decide whether any additional polish is worthwhile.
-- If continuing design work, focus only on first-screen rhythm, composer weight on laptop screens, and side-panel density.
-- Decide how to split or commit the broader working tree, which includes UI, doc, and domain changes from this phase.
-- Real LLM integration remains future work.
+- Finalize the remaining design sections:
+  - testing strategy
+  - implementation risks
+  - strict v1 scope boundaries
+- Write the design into a dedicated design doc if continuing the full brainstorming flow.
+- Then create the implementation plan and start code changes.
 
 ## Next Actions
-- Review the current desktop UI in browser and decide whether more polish is still needed.
-- If continuing UI work, focus only on:
-  - opening-line rhythm and spacing
-  - composer weight on 13/14-inch laptop screens
-  - right-side panel spacing and density
-- If switching back to product or implementation work, keep the simplified chat-first interaction principle as the source of truth.
-- Before shipping or handing off, decide how to split or commit the broader modified file set.
+- Continue from the design checkpoint and finish the remaining design sections for blank-user entry.
+- After design approval, implement the home CTA, backend start endpoint, blank seed path, and return-link UI.
 
 ## Blockers
 - None.
-- The working tree is intentionally dirty because this checkpoint spans an ongoing product/UI iteration rather than a finalized commit boundary.
 
 ## Decisions Made
 | Decision | Rationale |
 |----------|-----------|
-| Keep the UI chat-first and treat cards as in-chat confirmation only | This matches the founder direction and keeps the product usable for young families without system learning overhead. |
-| Optimize this phase for desktop/Mac web feel | Current demo review and founder feedback prioritized PC web experience over mobile parity. |
-| Use browser QA, not CSS intuition alone, to guide the last-mile polish | The remaining issues were about visual density and rhythm, which were easier to judge in a live browser than in code alone. |
-| Keep the side panel as the only visible exception for low-frequency controls | This preserves demo/operator access without letting it dominate the user-facing surface. |
-| Do not imply real LLM integration | The current pass is UI/interaction convergence only. |
+| Use a formal user-facing entry, not an internal test-only tool | Matches the user’s product intent. |
+| Ship no-account blank-user entry before any light-auth variant | Fastest route to a true new-user path with current architecture. |
+| Use one-click `Start a new plan` instead of a pre-create questionnaire | Keeps first touch friction minimal. |
+| Blank case should still include coach opening + 2-3 suggested starters | Avoids a dead empty screen while staying meaningfully cleaner than the demo seed. |
+| Return link should be explicit and copyable | Prevents no-account users from losing access to their case. |
+| Reuse the current home access page instead of adding a separate `/start` route first | Smallest viable change for this repo and current production shape. |
 
 ## Touched Files
-- app/globals.css
-- components/coach-shell.tsx
+- app/page.tsx
 - components/demo-access-gate.tsx
-- tests/components/coach-shell.test.tsx
-- tests/app/home-page.test.tsx
-- docs/product/onboarding-v1.md
-- docs/product/user-workflows.md
-- docs/product/canonical-product-blueprint-zh.md
-- docs/product/founder-priority-user-journeys-zh.md
-- lib/domain/demo-contracts.ts
-- lib/domain/demo-state.ts
+- components/coach-shell.tsx
 - lib/server/persistence.ts
-- tests/api/demo-routes.test.ts
-- tests/domain/demo-state.test.ts
+- docs/product/onboarding-v1.md
 - AGENTS.md
-- .gitignore
-- app/icon.svg
+- SKILLS.md
+- .task-archive/current.md
+- .task-archive/snapshots/20260329-221625-admitgenie-blank-user-entry-design.md
 - task_plan.md
 - progress.md
 - findings.md
-- .task-archive/current.md
-- .task-archive/snapshots/20260328-003556-admitgenie-ai-native-desktop-ui-checkpoint.md
 
 ## Verification
 | Check | Status | Details |
 |-------|--------|---------|
-| `pnpm test` | passed | 84/84 tests passed on the current workspace on 2026-03-28. |
-| `pnpm build` | passed | Production build succeeded with `next build --webpack` on 2026-03-28. |
-| Local browser QA | passed | Verified desktop access gate, main chat view, and side panel using Playwright against `http://127.0.0.1:3101`. |
-| Desktop visual polish | passed | Final browser review confirmed improved opening rhythm, calmer side-panel layering, and cleaner local demo presentation. |
+| Current entry-path inspection | passed | Confirmed the live product currently requires invite access and does not expose a blank-user create flow. |
+| Persistence inspection | passed | Confirmed the current drizzle seed path hydrates a starter persona-backed case rather than a blank case. |
+| Product design alignment | passed | Locked v1 direction through explicit user choices during brainstorming. |

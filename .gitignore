@@ -11,3 +11,5 @@ dist
 .task-archive/
 .gstack/
 output/
+.vercel
+.env*.local

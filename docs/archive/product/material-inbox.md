@@ -1,5 +1,9 @@
 # Material Inbox
 
+> Archived document.
+> This was a standalone product explainer before the current blueprint and workflow docs became the mainline.
+> For the current product truth, use `../../product/canonical-product-blueprint-zh.md` and `../../product/user-workflows.md`.
+
 ## Objective
 
 The Material Inbox gives the user a persistent way to add new information without restarting intake or losing the conversational relationship with the coach.

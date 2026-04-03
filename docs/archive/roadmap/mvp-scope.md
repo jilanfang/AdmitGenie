@@ -1,5 +1,9 @@
 # MVP Scope
 
+> Archived document.
+> This was an earlier scope snapshot. It is kept for history, not as the current source of truth.
+> For current scope boundaries, use `../../product/canonical-product-blueprint-zh.md` and `../../../AGENTS.md`.
+
 ## Must Have
 
 - Coach Inbox as the main product surface

@@ -1,5 +1,9 @@
 # AdmitGenie MVP Personas
 
+> Archived document.
+> This file captured persona thinking at an earlier stage.
+> The current executable persona source is `../../../lib/domain/personas.ts`.
+
 ## Purpose
 
 These personas are not generic marketing archetypes. They are operating profiles for product design, onboarding prompts, monthly brief tone, and demo storytelling.

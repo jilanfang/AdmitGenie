@@ -1,5 +1,9 @@
 # Integration Boundaries
 
+> Archived document.
+> This was an earlier integration sketch. It is preserved for context, not as the current implementation contract.
+> For the current deployed shape, read `../../deployment/vercel-demo.md` and `../../tech/system-architecture.md`.
+
 ## Objective
 
 Define what the MVP integrates with directly, what sits behind adapters, and what is explicitly deferred.

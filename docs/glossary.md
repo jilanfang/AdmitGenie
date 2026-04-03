@@ -1,5 +1,15 @@
 # AdmitGenie Glossary
 
+## Status
+
+This glossary is a support document, not the highest-level source of truth.
+
+If a term here conflicts with the current product blueprint or code reality, use:
+
+- `./product/canonical-product-blueprint-zh.md`
+- `./tech/system-architecture.md`
+- `../README.md`
+
 ## Product Terms
 
 **Coach Inbox**  
@@ -63,19 +73,13 @@ Previously known, but likely outdated based on time or conflicting inputs.
 **conflicting**  
 Two or more sources disagree, and the system cannot safely resolve the difference on its own.
 
-## AI Terms
+## Routing Terms
 
-**Interview Coach**  
-The AI role responsible for collecting minimal necessary information through natural dialogue.
+**Deterministic routing**
+The policy-safe fallback path that can still classify inputs, update state, and continue the coach flow without depending on external model output.
 
-**Profile Synthesizer**  
-The AI/system role that converts conversations and materials into structured profile state.
+**OpenAI-first routing**
+The current routing layer that tries external model-based classification and response generation first, while still falling back to deterministic behavior when that path fails.
 
-**Material Parser**  
-The ingestion component that classifies, extracts, and summarizes uploaded or pasted materials.
-
-**Brief Composer**  
-The component that turns current profile state, changes, and priorities into the Monthly Brief.
-
-**Update Notifier**  
-The component that decides whether new information should trigger an immediate alert, a new prompt, or wait for the next brief.
+**Decision card**
+An inline chat confirmation UI, limited to `yes / no`, `single-select`, or `multi-select`.

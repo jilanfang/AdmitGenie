@@ -1,5 +1,9 @@
 # Agent Architecture
 
+> Archived document.
+> This file describes an earlier conceptual role split. It is no longer the primary technical source of truth.
+> For the current technical baseline, read `../../tech/system-architecture.md`.
+
 ## Overview
 
 AdmitGenie MVP uses a small set of explicit AI roles instead of a single monolithic chatbot.

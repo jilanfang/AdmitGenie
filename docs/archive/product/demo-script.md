@@ -1,5 +1,9 @@
 # Demo Script
 
+> Archived document.
+> This demo script reflects an earlier product framing pass.
+> For the current product truth, start from `../../product/canonical-product-blueprint-zh.md`.
+
 ## Objective
 
 Show that AdmitGenie is an AI-native admissions coach, not a static form tool or generic chat bot.

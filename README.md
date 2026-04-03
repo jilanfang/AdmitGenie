@@ -19,7 +19,7 @@ AdmitGenie is a chat-first admissions coach for North America-focused families a
 - `lib/server/`
   Persistence adapter, pilot invite/session access, routing policy, and POC ops helpers.
 - `docs/`
-  Product source docs, customer corpus, deployment notes, and journey coverage artifacts.
+  Current product source docs, deployment notes, technical baselines, and archived historical plans.
 - `tests/`
   Domain, API, routing, and UI regressions including journey-report generation.
 
@@ -86,7 +86,7 @@ Then verify:
 - material upload outcomes stay visible in chat
 - shortlist/conflict decisions still use chat cards
 
-See [docs/deployment/vercel-demo.md](./docs/deployment/vercel-demo.md).
+See [docs/README.md](./docs/README.md) for the current doc index and [docs/deployment/vercel-demo.md](./docs/deployment/vercel-demo.md) for deployment details.
 
 ## Notes
 

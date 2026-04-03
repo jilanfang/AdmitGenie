@@ -1,5 +1,9 @@
 # Stack Decision
 
+> Archived document.
+> This file contains early stack assumptions and no longer fully matches the current dependencies in `package.json`.
+> For the current code reality, use `../../../package.json`, `../../tech/system-architecture.md`, and `../../deployment/vercel-demo.md`.
+
 ## Decision Summary
 
 AdmitGenie MVP uses a Vercel-first TypeScript stack.

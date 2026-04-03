@@ -1,5 +1,9 @@
 # AdmitGenie MVP PRD
 
+> Archived document.
+> This was an earlier MVP framing draft. It no longer defines the current product truth.
+> For current product truth, read `../../product/canonical-product-blueprint-zh.md` first.
+
 ## Document Status
 
 - Status: Draft v1

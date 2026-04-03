@@ -1,5 +1,8 @@
 # Data Models
 
+> Archived document.
+> This file captured an earlier suggested data model. The current code reality lives in `../../../db/schema.ts` and `../../../lib/server/persistence.ts`.
+
 ## Overview
 
 AdmitGenie MVP is AI-native at the interface layer, but internally it remains schema-driven.

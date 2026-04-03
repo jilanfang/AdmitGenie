@@ -51,7 +51,7 @@
 - 产品总蓝图：`docs/product/canonical-product-blueprint-zh.md`
 - 产品定位：`AGENTS.md`
 - founder 对齐问题：`docs/product/founder-alignment-checklist-zh.md`
-- persona 定义：`docs/product/personas.md`
+- persona fixture 与代码实现：`lib/domain/personas.ts`
 - 产品工作流：`docs/product/user-workflows.md`
 - 当前代码能力：`components/`, `lib/domain/`, `lib/server/`, `tests/`
 
@@ -1261,7 +1261,7 @@
 ### 9. 对应模块 / 代码
 
 - 本文档
-- `docs/product/personas.md`
+- `lib/domain/personas.ts`
 - `docs/product/founder-alignment-checklist-zh.md`
 - `AGENTS.md`
 
